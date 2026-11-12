@@ -53,7 +53,8 @@ show_steps: false
 show_glossary: false
 show_skipped: false
 direction: LR
-max_prose_words: 60
+max_prose_words: 45
+max_sentences_per_step: 1
 max_arrow_words: 5
 max_words_per_step: 20
 max_sentence_words: 20

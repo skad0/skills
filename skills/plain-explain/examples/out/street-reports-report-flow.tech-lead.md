@@ -4,9 +4,9 @@
 
 ```mermaid
 flowchart TB
-  client["Client"]
-  service["Service"]
-  storage["Storage"]
+  client["User"]
+  service["Report server"]
+  storage["Photo files"]
   map["Map page"]
   held["Not public"]
   client -->|"1. new report"| service
@@ -17,8 +17,14 @@ flowchart TB
   client -.->|"via Telegram"| service
 ```
 
-**Goal.** A user sends a photo of a street problem, and the report is shown on a public map.
+| Failure |
+| --- |
+| Report server → Not public: not public |
 
-- Public only after a safe photo: failure means never shown, and not at once.
-- Originals stay private; cost is two files and a worker.
-- Photo check is an outside service; form, photo work, and map share one place.
+**Goal.** A user sends a street photo and the map shows the report.
+
+| Tradeoffs and failure points |
+| --- |
+| Public only after a safe photo. |
+| Originals stay private; two files and a worker. |
+| Photo check is an outside service. |

@@ -23,7 +23,8 @@ show_steps: true
 show_glossary: false
 show_skipped: false
 direction: TB
-max_prose_words: 150
+max_prose_words: 100
+max_sentences_per_step: 1
 max_arrow_words: 5
 max_words_per_step: 22
 max_sentence_words: 22

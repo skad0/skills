@@ -15,7 +15,20 @@
     },
     "audience": {
       "type": "string",
-      "description": "Optional hint of a default lens id. The CLI --lens flag is what actually applies."
+      "description": "Default lens id when render is called without --lens."
+    },
+    "audiences": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "description": "Allowed terms per audience name or lens id. No glossary entry required. --audience selects an extra key; the lens id and all always apply."
+    },
+    "allowed_terms": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Extra allowed terms for every lens, with no glossary entry."
     },
     "direction": {
       "type": "string",
@@ -137,7 +150,15 @@
         "label": {
           "type": "string",
           "minLength": 1,
-          "description": "What moves, at most five words. Visible steps prefix a number: '1. photo and place'."
+          "description": "Short text on the arrow. action is what is drawn when set."
+        },
+        "actor": {
+          "type": "string",
+          "description": "Who acts. A concrete actor, such as the visitor's browser or the site owner."
+        },
+        "action": {
+          "type": "string",
+          "description": "What they do, at most five words, such as GET /about or HTML coming back. Drawn on the arrow."
         },
         "step": {
           "type": "integer",

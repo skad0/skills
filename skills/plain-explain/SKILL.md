@@ -1,33 +1,31 @@
 ---
 name: plain-explain
 description: >-
-  Use this when explaining a technical system or flow to a new engineer, a
-  product person, or a tech lead: diagram-first Mermaid boxes and arrows that
-  carry almost everything, a short shared vocabulary, no skipped steps, minimal
-  prose, rendered to Markdown or HTML through swappable lenses and templates.
+  Use this when explaining one technical path to one audience: a diagram of
+  concrete actors and actions, plain words, no skipped steps, and a short
+  table, as Markdown or a standalone SVG.
 ---
 # Plain explain
 
-Use this when you need to explain a technical path and two things usually go wrong: the writer uses words the reader does not share, and the writer skips hops that feel obvious. The skill forces a **diagram-first** model: a short shared vocabulary, no skipped steps, and a Mermaid picture that should stand on its own. Prose under the diagram is a tight remainder (a one-line goal, at most three short bullets; a compact step list only for new engineers).
+Use this when a technical path must land in a doc as one short picture: real actors, every hop, and words that audience already uses. One lens, one diagram, and a table. Three-lens tabs are opt-in.
 
 Helpers sit next to this skill. Run commands from this folder (paths below are relative to it): `explain.py`, `model.schema.json`, `MODEL.md`, `lenses/`, `templates/`, `common-words.txt`, `synonyms.txt`, and `examples/`.
 
 ## When to use
 
-- One path through a system, for a new engineer, a product person, or a tech lead, or the same path for all three, without rewriting it.
-- Checking a draft: `check` flags unknown words, skipped hops, a weak picture, and a prose overflow.
+- One path, for one audience (a new engineer, a product person, or a tech lead).
+- Checking a draft: `check` prints what each lens keeps, then flags unknown words, skipped hops, abstract actors, and prose that is long or dense.
 
 Do not use it for a style guide, a formal spec, or a UML sequence diagram.
 
 ## The picture does the work
 
-- A **box** is a thing. An **arrow** is something moving. The **arrow label** is what moves, numbered, and at most five words (`1. photo and place`).
-- **Dashed arrows** (`kind: optional` or `kind: failure`) are other paths and failures, not a "skipped" essay.
-- **Decision/branch** arrows split a path (`not public` vs the main hop). A box may have `shape: decision`.
-- Optional short `note` on a box. `group` draws a Mermaid subgraph. Self-loops are banned.
-- **Product and tech-lead have no step list.** Engineer gets compact one-liners. Closing copy is at most three short bullets. Glossary and skipped lists stay off unless you turn them on; put those facts in the diagram.
+- A **box** is a concrete actor or thing (`User phone`, `Report server`, the visitor's browser). An **arrow** has an `actor` and an `action` (`user`, `GET /about`). The action is the label, numbered, at most five words.
+- **Dashed arrows** (`kind: optional` or `kind: failure`) are other paths and failures. Failure arrows are drawn on the picture and listed in a table immediately under it.
+- **Decision/branch** arrows split a path. A box may have `shape: decision`. Optional short `note`. `group` draws a subgraph. Self-loops are banned.
+- **Product and tech-lead have no step list.** Engineer steps are one sentence each. Closing rows are a table of at most three lines.
 
-Prose budgets, enforced by `check`: product <=60 words, tech-lead <=80, engineer <=150, all outside the diagram.
+Prose budgets, outside the diagram: product <=45 words, tech-lead <=50, engineer <=100. Density: each shown step is at most one sentence, so a count at the word cap still fails when a step has two.
 
 ## Workflow
 
@@ -35,72 +33,59 @@ Prose budgets, enforced by `check`: product <=60 words, tech-lead <=80, engineer
 
 Read the real system. Do not invent parts. Start from `python3 explain.py scaffold -o model.json`, or copy `examples/street-reports-report-flow.json`. The schema is `model.schema.json`; the guide is `MODEL.md`.
 
-Write the **finest** graph (the engineer view): real boxes, real hops, dashed failure and optional paths. Give coarser boxes for other lenses: `level` (1 = everyone, 2 = tech-lead aggregates, 3 = engineer detail), `collapse_to` on fine boxes, `aggregate: true` on the coarse parents. Product (`max_level: 1`, `collapse: true`) and tech-lead (`max_level: 2`, `collapse: true`) then get a derived picture. Do not hand-draw bypass arrows, and do not use a self-loop to fake a hop.
+Write the finest graph. Name real actors on the boxes. Put `actor` and `action` on every arrow. Give coarser boxes a `level` (1 = everyone, 2 = tech-lead, 3 = engineer), `collapse_to` on fine boxes, and `aggregate: true` on the parents. Set `audience` to the lens you will render. Put team words in `audiences` (`{"engineer-new": ["DM", "Thunderbolt"]}`) so they pass with no glossary line.
 
-The `goal` is shown under every lens, so write it in words every lens allows. Closing copy goes in `risks`, `user_impact`, and `tradeoffs` (<=3 short bullets each). Keys starting with `_` are author notes, not rendered.
+The `goal` is one sentence in words every lens allows. Closing rows go in `risks`, `user_impact`, and `tradeoffs` (<=3, one sentence each). Keys starting with `_` are author notes.
 
 ### 2. Pick a lens
 
 | Lens | File | Picture | Prose |
 |---|---|---|---|
-| `product` | `lenses/product.yaml` | User journey, >=3 boxes | Goal + <=3 impact bullets, <=60 words |
-| `engineer-new` | `lenses/engineer-new.yaml` | Full graph, internals, subgraphs | Goal + <=3 risks + one-line steps, <=150 words |
-| `tech-lead` | `lenses/tech-lead.yaml` | Coarse boxes (client, service, storage) | Goal + <=3 tradeoffs, <=80 words |
+| `product` | `lenses/product.yaml` | User journey, >=3 boxes | Goal + <=3 impact rows, <=45 words |
+| `engineer-new` | `lenses/engineer-new.yaml` | Full graph | Goal + <=3 risks + one-sentence steps, <=100 words |
+| `tech-lead` | `lenses/tech-lead.yaml` | Coarse real parts | Goal + <=3 tradeoff rows, <=50 words |
 
-`lenses/base-terms.txt` is the shared core. `extends: base` prepends it. Aim for 30-60 resolved terms.
+`lenses/base-terms.txt` is the shared core. `extends: base` prepends it. `check --audience NAME` also allows `audiences.NAME`.
 
-### 3. Check, then fix words and gaps
+### 3. Check, then fix
 
 ```bash
-python3 explain.py check path/to/model.json --lens product
-python3 explain.py lint path/to/model.json --lens product
+python3 explain.py check path/to/model.json --lens engineer-new
+python3 explain.py lint path/to/model.json --lens engineer-new
 ```
 
-`check` reports vocabulary errors (with location), gaps (self-loops, a disconnected graph, a step that starts at a box not yet reached, a picture below `min_boxes`), and limits (box/step caps, arrow-label length, prose budget, closing-item cap). It warns on mid-sentence proper nouns not in the glossary. Non-zero exit only for errors.
+`check` prints, for every lens, which boxes are kept and which collapse into which, before the verdict. Then vocabulary, gaps, and limits. It warns on abstract labels (`Export step`, `Service`, `Renderer`, `data`) and on an arrow with no actor or action. A step whose level this lens filters out does not become a bare "step not reached": the hop still counts when its arrow stays visible, and otherwise the error names the lens, the step, and the level. A collapse under `min_boxes` warns that the picture is below a useful size. Non-zero exit only for errors.
 
-`lint` (and `suggest`) looks up unknown words in `synonyms.txt` and proposes allowed replacements. For each leftover unknown term, replace it with allowed words or add a one-line glossary entry written from allowed words.
+`lint` proposes replacements from `synonyms.txt`. For a leftover term, rewrite it, add it under `audiences`, or add a one-line glossary entry.
 
-If a hop is missing, add the box, the arrow, and (for engineer) a one-line step. If you are leaving it out, draw it as a dashed arrow or a `Not shown` box; do not hide it in a paragraph.
-
-Run `check` for every lens you will render.
-
-### 4. Render
+### 4. Render one output
 
 ```bash
+python3 explain.py render path/to/model.json -o out.md
+python3 explain.py render path/to/model.json --format svg -o out.svg
+python3 explain.py render path/to/model.json --format structure -o out.json
 python3 explain.py render path/to/model.json --all -o out/
-python3 explain.py render path/to/model.json --lens product --format md -o out.md
 ```
 
-`--all` writes every lens as `md` and `html`, plus a tabbed combined page (`html-tabs`). Render refuses to write if `check` fails, unless `--force`. The same input is always byte-identical.
-
-`--format` picks `templates/<format>.tmpl`. Adding a format is adding a file. Template syntax is in `MODEL.md`.
+The default is one lens (`audience`, else `engineer-new`) as Markdown: one diagram, the failure table, then the closing table. `--format svg` is a standalone picture (no Mermaid). `--format structure` is the resolved boxes, arrows, and steps for another renderer. `--all` is opt-in: every lens, plus the tabbed page. Render refuses to write if `check` fails, unless `--force`. The same input is always byte-identical.
 
 ## How to add a lens or a template
 
-Copy a file in `lenses/` to `lenses/<id>.yaml`. Keep the same shape (`id`, `name`, optional `extends: base`, `allowed_terms`, `max_level`, `collapse`, `min_boxes`/`max_boxes`, `show_steps`, `max_prose_words`, `closing_section`, `direction`, `tone`). Point `closing_section.field` at a model array. Check a known model against the new lens.
-
-Add `templates/<format>.tmpl`. Context: `title`, `goal`, `lens_id`, `lens_name`, `mermaid`, `show_steps`, `steps`, `closing`, `glossary`, `skipped`, `details`. Empty sections are `false`. `{{name}}` is escaped for HTML; use `{{{mermaid}}}` raw. Render twice and `diff`.
-
-## Authoring tips
-
-- Write the engineer graph first. Get the product and tech-lead pictures from `collapse_to`, not from a second set of arrows.
-- Put the number on the arrow, not only in a step list. If the picture needs a sentence to be understood, the label is wrong or a hop is missing.
-- Failure and optional paths belong on dashed arrows, never in a long "Skipped on purpose" list.
-- Keep each closing bullet to one short sentence. If you cannot say it in one line, it belongs on the diagram.
-- When `check` flags a normal English word, try `lint` before inventing a clumsy paraphrase.
+Copy `lenses/<id>.yaml`. Keep `id`, `name`, optional `extends: base`, `allowed_terms`, `max_level`, `collapse`, `min_boxes`/`max_boxes`, `max_prose_words`, `max_sentences_per_step`, `show_steps`, `closing_section`, `direction`. Add `templates/<format>.tmpl` for a text format. `svg` and `structure` are built in. Context keys are in `MODEL.md`.
 
 ## Common mistakes
 
-- **A two-box product picture with a self-loop.** That is a fake hop. Product needs at least source, a middle step, and the result; `min_boxes` is 3.
-- **Tech-lead identical to engineer.** If the mermaid matches, the coarse boxes are missing or `collapse` is off.
-- **Walls of text under a small diagram.** If prose is over the cap, move facts onto labels and dashed arrows, and cut the step list.
-- **Hand-drawn `visibility: external` bypass arrows.** Use `level` and `collapse_to` instead.
-- **Invented components.** If unsure, draw a dashed path and say so on the label, or leave a `_` author note.
+- **Abstract boxes** (`Service`, `Export step`, `Renderer`, `data`). Name the actor: site owner, developer, the visitor's browser.
+- **A two-box picture.** Product needs a source, a middle, and a result. If collapse lands under `min_boxes`, read the plan `check` printed.
+- **Three lenses when one was asked.** Default render is one lens. Pass `--all` only for the tabs.
+- **A word count at the cap.** One sentence per step. If it does not fit, put it on the arrow.
+- **Hand-drawn bypass arrows.** Use `level` and `collapse_to`.
+- **Invented parts.** Draw a dashed arrow and say so on the action, or leave a `_` note.
 
 ## Rules
 
-- Geometry only: boxes, arrows, labels. Branches and dashed paths are allowed; no notation the reader must already know.
+- Boxes, arrows, actions. Every arrow has an actor and an action. No self-loops.
 - At most 7 boxes by default; tech-lead caps at 5; product at least 3.
-- Goal first under the picture, then at most three bullets, details last (usually off).
-- Every visible normal arrow has a sender, a receiver, and what moves. No self-loops.
-- Visible words stay inside the lens. Unknown terms are rewritten or glossed.
+- One diagram, then the failure table, then at most three closing rows.
+- Failure arrows stay on the picture and in that table.
+- Visible words stay inside the lens, plus that audience's `audiences` list.

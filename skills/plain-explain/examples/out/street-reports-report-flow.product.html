@@ -58,6 +58,10 @@
     min-height: 12rem;
   }
   .diagram .mermaid { margin: 0; background: transparent; }
+  table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+  caption { text-align: left; font-weight: 650; margin: 0 0 0.35rem; }
+  td { border: 1px solid var(--line); padding: 0.35rem 0.6rem; }
+  table.failures caption { color: #9a3412; }
 </style>
 </head>
 <body>
@@ -66,7 +70,7 @@
   <p class="lens">For: Product</p>
   <div class="diagram">
     <pre class="mermaid">flowchart LR
-  phone["Phone"]
+  phone["User phone"]
   page["Report page"]
   map["Map page"]
   held["Not public"]
@@ -75,12 +79,17 @@
   page -->|"2. new report"| map
   page -.->|"not public"| held</pre>
   </div>
-  <p class="goal"><strong>Goal.</strong> A user sends a photo of a street problem, and the report is shown on a public map.</p>
-  <ul>
-    <li>No account is needed.</li>
-    <li>Not shown at once: faces and plates are made hard to read first.</li>
-    <li>A photo not fit for public is not shown.</li>
-  </ul>
+  <table class="failures">
+    <caption>Failure</caption>
+    <tr><td>Report page → Not public: not public</td></tr>
+  </table>
+  <p class="goal"><strong>Goal.</strong> A user sends a street photo and the map shows the report.</p>
+  <table>
+    <caption>User impact</caption>
+    <tr><td>No account is needed.</td></tr>
+    <tr><td>Faces and plates are hidden first.</td></tr>
+    <tr><td>A photo not fit for public is not shown.</td></tr>
+  </table>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>

@@ -4,12 +4,12 @@
 
 ```mermaid
 flowchart TB
-  phone["Phone"]
+  phone["User phone"]
   page["Report page"]
-  server["Server (one process)"]
-  subgraph g_Storage["Storage"]
+  server["Report server (one process)"]
+  subgraph g_Files["Files"]
     photos["Photo files"]
-    database["Database"]
+    database["Report records"]
   end
   map["Map page"]
   held["Not public"]
@@ -24,16 +24,22 @@ flowchart TB
   phone -.->|"via Telegram"| server
 ```
 
-**Goal.** A user sends a photo of a street problem, and the report is shown on a public map.
+| Failure |
+| --- |
+| Report server → Not public: not public |
 
-- If blur does not work or the photo is graphic, the report is not public.
-- If there is no place, the server returns an error.
-- Many flags take a report off the map.
+**Goal.** A user sends a street photo and the map shows the report.
 
-1. The user sends a photo and a place from the report page.
-2. The report page sends a new report to the server.
-3. The server stores the original photo as a private file.
-4. The server writes a report record.
-5. A worker blurs faces and plates and stores the safe photo.
-6. The map page asks the server for public reports.
-7. The server returns public reports; the map shows them.
+| What can go wrong |
+| --- |
+| If blur does not work, the report is not public. |
+| If there is no place, the server returns an error. |
+| Many flags take a report off the map. |
+
+1. The user sends a photo and a place.
+2. The page sends the report to the server.
+3. The server stores the original photo.
+4. The server writes a record.
+5. A worker blurs faces and plates.
+6. The map asks for public reports.
+7. The server returns the public reports.

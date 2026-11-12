@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart LR
-  phone["Phone"]
+  phone["User phone"]
   page["Report page"]
   map["Map page"]
   held["Not public"]
@@ -14,8 +14,14 @@ flowchart LR
   page -.->|"not public"| held
 ```
 
-**Goal.** A user sends a photo of a street problem, and the report is shown on a public map.
+| Failure |
+| --- |
+| Report page → Not public: not public |
 
-- No account is needed.
-- Not shown at once: faces and plates are made hard to read first.
-- A photo not fit for public is not shown.
+**Goal.** A user sends a street photo and the map shows the report.
+
+| User impact |
+| --- |
+| No account is needed. |
+| Faces and plates are hidden first. |
+| A photo not fit for public is not shown. |

@@ -496,6 +496,7 @@ _LENS_DEFAULTS = {
     "max_arrow_words": 5,
     "max_words_per_step": 25,
     "max_sentence_words": 22,
+    "max_sentences_per_step": 1,
     "max_closing_items": 3,
 }
 
@@ -577,6 +578,13 @@ def _kind(arrow: dict) -> str:
     if k not in ("normal", "optional", "failure", "query", "branch"):
         return "normal"
     return k
+
+
+def _shown_action(arrow: dict) -> str:
+    action = (arrow.get("action") or "").strip()
+    if action:
+        return action
+    return (arrow.get("label") or "").strip()
 
 
 def _is_dashed(arrow: dict) -> bool:
@@ -702,6 +710,8 @@ def _collapse_arrows(model: dict, lens: dict, visible_ids: list[str]) -> list[di
                                     "from": u,
                                     "to": node,
                                     "label": label_src.get("label") or "",
+                                    "actor": (label_src.get("actor") or path[0].get("actor") or ""),
+                                    "action": (label_src.get("action") or label_src.get("label") or ""),
                                     "kind": kind,
                                     "style": "dashed" if kind in ("failure", "optional") or any(_is_dashed(p) for p in path) else "solid",
                                     "step": path[0].get("step"),
@@ -779,18 +789,47 @@ def _merge_parallel_arrows(arrows: list[dict], max_words: int) -> list[dict]:
             origins.append(a.get("_origin"))
             origins.extend(a.get("_path") or [])
         joined = ", ".join(labels)
+        actions = []
+        for a in group:
+            act = (a.get("action") or "").strip()
+            if act and act not in actions:
+                actions.append(act)
+        joined_action = ", ".join(actions)
+        shown = joined_action or joined
         # If the join is too long, keep the arrows separate so the label cap
         # can be decided by the author, not by a truncated merge.
-        if count_words(joined) > max_words:
+        if count_words(joined) > max_words or count_words(shown) > max_words:
             out.extend(group)
             continue
         merged = dict(group[0])
         merged["label"] = joined
+        if joined_action:
+            merged["action"] = joined_action
         merged["_origin"] = group[0].get("_origin")
         merged["_path"] = [o for o in origins if o]
         merged["_merged_from"] = [a["id"] for a in group]
         out.append(merged)
     return out
+
+
+def collapse_note(model: dict, lens: dict, visible_ids: list[str]) -> dict:
+    """kept ids, `fine -> coarse` pairs, and boxes this lens drops."""
+    by_id = _boxes_by_id(model)
+    visible = set(visible_ids)
+    collapsed = []
+    hidden = []
+    for b in model.get("boxes") or []:
+        if not isinstance(b, dict) or not b.get("id"):
+            continue
+        bid = b["id"]
+        if bid in visible:
+            continue
+        dest = representative(bid, by_id, lens, visible)
+        if dest and dest != bid:
+            collapsed.append(f"{bid} -> {dest}")
+        else:
+            hidden.append(bid)
+    return {"kept": list(visible_ids), "collapsed": collapsed, "hidden": hidden}
 
 
 def apply_lens(model: dict, lens: dict) -> dict:
@@ -827,28 +866,38 @@ def apply_lens(model: dict, lens: dict) -> dict:
             if key:
                 origins.setdefault(key, []).append(a)
 
+    def _filter_reason(sl):
+        if max_level is None:
+            return None
+        if isinstance(sl, int) and sl != int(max_level):
+            return f"level {sl} != max_level {int(max_level)}"
+        if sl is None and int(max_level) < 3:
+            return f"no level and max_level {int(max_level)} < 3"
+        return None
+
     steps_kept = []
+    steps_filtered = []
     for s in model.get("steps") or []:
         if not isinstance(s, dict):
             continue
         sl = s.get("level")
-        if max_level is not None and isinstance(sl, int) and sl != int(max_level):
-            continue
-        if max_level is not None and sl is None:
-            # Unleveled steps are treated as finest (only the highest lens).
-            # Product/tech-lead authors should set level explicitly.
-            if int(max_level) < 3:
-                continue
+        reason = _filter_reason(sl)
         arrow_id = s.get("arrow")
         attached = origins.get(arrow_id) or [a for a in arrows if a.get("id") == arrow_id]
+        if reason:
+            vis = attached[0] if attached else None
+            steps_filtered.append(
+                {
+                    "n": s.get("n"),
+                    "level": sl,
+                    "reason": reason,
+                    "visible": vis is not None,
+                    "from": vis.get("from") if vis else None,
+                    "to": vis.get("to") if vis else None,
+                }
+            )
+            continue
         if not attached:
-            # Fine-only step with no surviving arrow: drop.
-            if sl is not None and max_level is not None and sl > int(max_level):
-                continue
-            if sl is not None and (max_level is None or sl <= int(max_level)):
-                # Level-appropriate step whose arrow vanished (became a self-loop):
-                # drop rather than leave a dangling step.
-                continue
             continue
         s2 = dict(s)
         s2["arrow"] = attached[0]["id"]
@@ -917,6 +966,10 @@ def apply_lens(model: dict, lens: dict) -> dict:
         "direction": lens.get("direction") or model.get("direction") or "TB",
         "lens": lens,
         "max_closing_items": max_close,
+        "audiences": model.get("audiences") if isinstance(model.get("audiences"), dict) else {},
+        "allowed_terms": model.get("allowed_terms") if isinstance(model.get("allowed_terms"), list) else [],
+        "collapse_note": collapse_note(model, lens, visible_ids),
+        "steps_filtered": steps_filtered,
     }
 
 
@@ -1165,7 +1218,18 @@ def _gap_issues(view: dict) -> list[Issue]:
     # A box with only failure/optional incoming can still be a source of the main path.
     reached |= sources
     arrow_by_id = {a["id"]: a for a in arrows}
+    filtered = sorted(view.get("steps_filtered") or [], key=lambda s: s.get("n") or 0)
+    fi = 0
+    lens_id = (view.get("lens") or {}).get("id") or ""
     for s in steps:
+        orig = s.get("_orig_n") or s["n"]
+        while fi < len(filtered) and (filtered[fi].get("n") or 0) < orig:
+            fs = filtered[fi]
+            fi += 1
+            if fs.get("visible") and fs.get("from"):
+                reached.add(fs["from"])
+                if fs.get("to"):
+                    reached.add(fs["to"])
         a = arrow_by_id.get(s["arrow"])
         if not a:
             continue
@@ -1174,13 +1238,18 @@ def _gap_issues(view: dict) -> list[Issue]:
             # A new actor starts asking (e.g. the map page). It is a source of this phase.
             reached.add(frm)
         elif frm not in reached and frm not in sources:
-            issues.append(
-                Issue(
-                    "gap",
-                    f"step {s['n']} starts at '{frm}', which has not been reached yet",
-                    f"steps[{s['n']}]",
+            prior = [fs for fs in filtered if (fs.get("n") or 0) < orig]
+            if prior:
+                bits = ", ".join(
+                    f"step {fs.get('n')} ({fs.get('reason')})" for fs in prior
                 )
-            )
+                message = (
+                    f"lens {lens_id} filtered {bits}; "
+                    f"step {s['n']} starts at '{frm}', which has not been reached"
+                )
+            else:
+                message = f"step {s['n']} starts at '{frm}', which has not been reached yet"
+            issues.append(Issue("gap", message, f"steps[{s['n']}]"))
         reached.add(frm)
         reached.add(a["to"])
     return issues
@@ -1202,7 +1271,7 @@ def _limit_issues(view: dict, lens: dict) -> list[Issue]:
 
     max_arrow = lens.get("max_arrow_words") or 5
     for a in view["arrows"]:
-        n = count_words(a.get("label") or "")
+        n = count_words(_shown_action(a))
         if n > max_arrow:
             issues.append(
                 Issue(
@@ -1213,14 +1282,26 @@ def _limit_issues(view: dict, lens: dict) -> list[Issue]:
             )
     max_w = lens.get("max_words_per_step")
     max_s = lens.get("max_sentence_words")
+    max_sent = lens.get("max_sentences_per_step")
     if view.get("show_steps"):
         for s in view["steps"]:
-            w = count_words(s.get("text") or "")
+            text = s.get("text") or ""
+            w = count_words(text)
             if isinstance(max_w, int) and w > max_w:
                 issues.append(
                     Issue("limits", f"step has {w} words (max {max_w})", f"steps[{s['n']}]")
                 )
-            for sent in sentences(s.get("text") or ""):
+            n_sent = len(sentences(text))
+            if isinstance(max_sent, int) and n_sent > max_sent:
+                issues.append(
+                    Issue(
+                        "limits",
+                        f"step has {n_sent} sentences (max {max_sent} per step); "
+                        "a word count at the cap is not a pass",
+                        f"steps[{s['n']}]",
+                    )
+                )
+            for sent in sentences(text):
                 sw = count_words(sent)
                 if isinstance(max_s, int) and sw > max_s:
                     issues.append(
@@ -1230,6 +1311,18 @@ def _limit_issues(view: dict, lens: dict) -> list[Issue]:
                             f"steps[{s['n']}]",
                         )
                     )
+    if lens.get("collapse"):
+        useful = lens.get("min_boxes") if isinstance(lens.get("min_boxes"), int) else 3
+        if n_boxes < useful:
+            note = view.get("collapse_note") or {}
+            detail = ", ".join(note.get("collapsed") or []) or "(none)"
+            issues.append(
+                Issue(
+                    "limits",
+                    f"collapse leaves {n_boxes} boxes, below a useful size ({useful}); collapsed: {detail}",
+                    level="warn",
+                )
+            )
     max_close = lens.get("max_closing_items")
     if isinstance(max_close, int) and len(view.get("closing_items") or []) > max_close:
         issues.append(
@@ -1453,7 +1546,10 @@ def _vocab_chunks(view: dict, include_glossary: bool = True) -> list[tuple[str, 
         if b.get("note"):
             chunks.append((f"boxes[{b['id']}].note", b["note"]))
     for a in view["arrows"]:
-        chunks.append((f"arrows[{a['id']}].label", a.get("label") or ""))
+        chunks.append((f"arrows[{a['id']}].action", _shown_action(a)))
+        actor = (a.get("actor") or "").strip()
+        if actor:
+            chunks.append((f"arrows[{a['id']}].actor", actor))
     if view.get("show_steps"):
         for s in view["steps"]:
             chunks.append((f"steps[{s['n']}].text", s.get("text") or ""))
@@ -1474,8 +1570,33 @@ def _vocab_chunks(view: dict, include_glossary: bool = True) -> list[tuple[str, 
     return chunks
 
 
+def _extra_allowed(view: dict, lens: dict) -> list[str]:
+    """Terms the model grants this audience, with no glossary entry."""
+    found: list[str] = []
+    raw = view.get("audiences") if isinstance(view.get("audiences"), dict) else {}
+    keys: list[str] = []
+    for key in (lens.get("audience"), lens.get("id"), "all"):
+        if isinstance(key, str) and key and key not in keys:
+            keys.append(key)
+    for key in keys:
+        val = raw.get(key)
+        if isinstance(val, list):
+            for t in val:
+                if isinstance(t, str) and t not in found:
+                    found.append(t)
+    extra = view.get("allowed_terms")
+    if isinstance(extra, list):
+        for t in extra:
+            if isinstance(t, str) and t not in found:
+                found.append(t)
+    return found
+
+
 def _lexicon_for(view: dict, lens: dict, common: set[str]) -> tuple[set[str], list[str]]:
     terms = list(lens.get("resolved_terms") or [])
+    for t in _extra_allowed(view, lens):
+        if t not in terms:
+            terms.append(t)
     for g in view.get("glossary") or []:
         t = (g.get("term") or "").strip()
         if t and t not in terms:
@@ -1520,13 +1641,68 @@ def _vocab_issues(view: dict, lens: dict, common: set[str]) -> list[Issue]:
     return issues
 
 
-def check(model: dict, lens: dict, common: set[str] | None = None) -> list[Issue]:
+_ABSTRACT_WORDS = {"service", "renderer", "data"}
+_ACTOR_HINT = 'such as "site owner", "developer", or "the visitor\'s browser"'
+_ACTION_HINT = 'such as "GET /about" or "HTML coming back"'
+
+
+def _bind_audience(lens: dict, audience: str | None) -> dict:
+    if not audience:
+        return lens
+    bound = dict(lens)
+    bound["audience"] = audience
+    return bound
+
+
+def _actor_issues(model: dict, view: dict) -> list[Issue]:
+    issues: list[Issue] = []
+    for b in model.get("boxes") or []:
+        if not isinstance(b, dict):
+            continue
+        label = (b.get("label") or "").strip()
+        words = [w.lower() for w in re.findall(r"[A-Za-z]+", label)]
+        abstract = bool(words) and (words[-1] == "step" or any(w in _ABSTRACT_WORDS for w in words))
+        if abstract:
+            issues.append(
+                Issue(
+                    "actors",
+                    f"box label {label!r} is abstract; name a concrete actor or thing, {_ACTOR_HINT}",
+                    f"boxes[{b.get('id')}].label",
+                    level="warn",
+                )
+            )
+    for a in view.get("arrows") or []:
+        loc = f"arrows[{a.get('id')}]"
+        if not (a.get("actor") or "").strip():
+            issues.append(
+                Issue(
+                    "actors",
+                    f"arrow has no actor; name who acts, {_ACTOR_HINT}",
+                    loc,
+                    level="warn",
+                )
+            )
+        if not (a.get("action") or "").strip():
+            issues.append(
+                Issue(
+                    "actors",
+                    f"arrow has no action; name what they do, {_ACTION_HINT}",
+                    loc,
+                    level="warn",
+                )
+            )
+    return issues
+
+
+def check(model: dict, lens: dict, common: set[str] | None = None, audience: str | None = None) -> list[Issue]:
     common = common if common is not None else load_common_words()
+    lens = _bind_audience(lens, audience)
     issues = _schema_issues(model)
     view = apply_lens(model, lens)
     issues.extend(_gap_issues(view))
     issues.extend(_limit_issues(view, lens))
     issues.extend(_vocab_issues(view, lens, common))
+    issues.extend(_actor_issues(model, view))
     return issues
 
 
@@ -1539,10 +1715,11 @@ def errors_only(issues: list[Issue]) -> list[Issue]:
 # ---------------------------------------------------------------------------
 
 
-def suggest(model: dict, lens: dict, common: set[str] | None = None, synonyms: dict | None = None) -> list[str]:
+def suggest(model: dict, lens: dict, common: set[str] | None = None, synonyms: dict | None = None, audience: str | None = None) -> list[str]:
     """Human-readable replacement hints for vocabulary errors."""
     common = common if common is not None else load_common_words()
     synonyms = synonyms if synonyms is not None else load_synonyms()
+    lens = _bind_audience(lens, audience)
     view = apply_lens(model, lens)
     lexicon, phrases = _lexicon_for(view, lens, common)
     lines = []
@@ -1611,7 +1788,7 @@ def _box_mermaid(box: dict) -> str:
 
 
 def _arrow_label(arrow: dict) -> str:
-    raw = (arrow.get("label") or "").strip()
+    raw = _shown_action(arrow)
     n = arrow.get("step_n")
     if isinstance(n, int) and _kind(arrow) in ("normal", "branch", "query"):
         # Don't double-prefix if the author already numbered it.
@@ -1681,12 +1858,26 @@ def _rendered_closing(view: dict):
     return False
 
 
+def _failure_rows(view: dict) -> list[str]:
+    labels = {b["id"]: (b.get("label") or b["id"]) for b in view["boxes"]}
+    rows = []
+    for a in view["arrows"]:
+        if _kind(a) != "failure":
+            continue
+        src = labels.get(a["from"], a["from"])
+        dst = labels.get(a["to"], a["to"])
+        action = _shown_action(a).replace("|", "/")
+        rows.append(f"{src} → {dst}: {action}")
+    return rows
+
+
 def build_context(view: dict) -> dict:
     glossary_entries = _used_glossary(view) if view.get("show_glossary") else []
     skipped = view.get("skipped") or [] if view.get("show_skipped") else []
     details = view.get("details")
     lens = view["lens"]
     steps = [{"n": s["n"], "text": s["text"]} for s in view["steps"]] if view.get("show_steps") else []
+    fail_rows = _failure_rows(view)
     return {
         "title": view["title"],
         "goal": view["goal"],
@@ -1695,6 +1886,7 @@ def build_context(view: dict) -> dict:
         "mermaid": mermaid_source(view),
         "steps": steps,
         "show_steps": bool(steps),
+        "failures": {"rows": fail_rows} if fail_rows else False,
         "closing": _rendered_closing(view),
         "glossary": {"entries": glossary_entries} if glossary_entries else False,
         "skipped": {"items": skipped} if skipped else False,
@@ -1714,8 +1906,384 @@ def load_template(fmt: str, templates_dir: Path | None = None) -> tuple[str, Pat
     return path.read_text(encoding="utf-8"), path
 
 
+def structure_document(view: dict) -> dict:
+    """Resolved picture for one lens: boxes, arrows (actor, action, kind), steps."""
+    note = view.get("collapse_note") or {}
+    closing = _rendered_closing(view)
+    return {
+        "title": view.get("title") or "",
+        "goal": view.get("goal") or "",
+        "lens_id": (view.get("lens") or {}).get("id") or "",
+        "direction": view.get("direction") or "TB",
+        "boxes": [
+            {
+                "id": b["id"],
+                "label": b.get("label") or "",
+                "note": b.get("note") or "",
+                "shape": b.get("shape") or "box",
+            }
+            for b in view["boxes"]
+        ],
+        "arrows": [
+            {
+                "id": a["id"],
+                "from": a["from"],
+                "to": a["to"],
+                "actor": (a.get("actor") or "").strip(),
+                "action": _shown_action(a),
+                "kind": _kind(a),
+                "dashed": _is_dashed(a),
+            }
+            for a in view["arrows"]
+        ],
+        "steps": [
+            {"n": s["n"], "text": s.get("text") or "", "arrow": s.get("arrow") or ""}
+            for s in view["steps"]
+        ],
+        "closing": closing if closing else {"name": "", "items": []},
+        "kept": list(note.get("kept") or []),
+        "collapsed": list(note.get("collapsed") or []),
+    }
+
+
+def structure_json(view: dict) -> str:
+    return json.dumps(structure_document(view), indent=2, ensure_ascii=False) + "\n"
+
+
+def _svg_layers(boxes: list[dict], arrows: list[dict]) -> list[list[str]]:
+    ids = [b["id"] for b in boxes]
+    index = {i: n for n, i in enumerate(ids)}
+    idset = set(ids)
+    spine_out = {i: [] for i in ids}
+    spine_in = {i: 0 for i in ids}
+    pred = {i: [] for i in ids}
+    for a in arrows:
+        frm, to = a.get("from"), a.get("to")
+        if frm not in idset or to not in idset or frm == to:
+            continue
+        pred[to].append(frm)
+        if _kind(a) in ("normal", "branch"):
+            spine_out[frm].append(to)
+            spine_in[to] += 1
+    indeg = dict(spine_in)
+    depth = {i: 0 for i in ids}
+    q = [i for i in ids if indeg[i] == 0]
+    seen: set[str] = set()
+    while q:
+        q.sort(key=lambda i: index[i])
+        n = q.pop(0)
+        if n in seen:
+            continue
+        seen.add(n)
+        for m in spine_out[n]:
+            depth[m] = max(depth[m], depth[n] + 1)
+            indeg[m] -= 1
+            if indeg[m] == 0:
+                q.append(m)
+    base = max(depth.values(), default=0) + 1
+    for i in ids:
+        if i not in seen:
+            depth[i] = base
+    for i in ids:
+        if spine_out[i] or spine_in[i] or not pred[i]:
+            continue
+        depth[i] = max(depth[p] for p in pred[i]) + 1
+    groups: dict[int, list[str]] = {}
+    for i in ids:
+        groups.setdefault(depth[i], []).append(i)
+    return [groups[k] for k in sorted(groups)]
+
+
+def _svg_box_size(label: str, note: str) -> tuple[int, int]:
+    width = 32 + int(len(label) * 7.6)
+    if note:
+        width = max(width, 32 + int(len(note) * 6.2))
+    return max(136, min(220, width)), (58 if note else 44)
+
+
+def svg_document(view: dict) -> str:
+    """Standalone flowchart. Integer grid, stdlib only, failure arrows last and darker."""
+    boxes = [b for b in view.get("boxes") or [] if b.get("id")]
+    arrows = [a for a in view.get("arrows") or [] if a.get("from") and a.get("to")]
+    by_id = {b["id"]: b for b in boxes}
+    direction = (view.get("direction") or "TB").upper()
+    if direction not in ("LR", "TB", "RL", "BT"):
+        direction = "TB"
+    if direction in ("RL", "BT"):
+        direction = "LR" if direction == "RL" else "TB"
+    layers = _svg_layers(boxes, arrows)
+    depth = {i: di for di, layer in enumerate(layers) for i in layer}
+    sizes = {
+        b["id"]: _svg_box_size(b.get("label") or b["id"], (b.get("note") or "").strip())
+        for b in boxes
+    }
+    gap_x, gap_y = 36, 92
+    pos: dict[str, tuple[int, int, int, int]] = {}
+    if direction == "LR":
+        x = 0
+        for layer in layers:
+            col_w = max(sizes[i][0] for i in layer)
+            y = 0
+            for i in layer:
+                w, h = sizes[i]
+                pos[i] = (x + (col_w - w) // 2, y, w, h)
+                y += h + gap_y
+            x += col_w + gap_x + 48
+    else:
+        row_w = []
+        for layer in layers:
+            row_w.append(sum(sizes[i][0] for i in layer) + gap_x * (len(layer) - 1))
+        widest = max(row_w, default=0)
+        y = 0
+        for layer, rw in zip(layers, row_w):
+            x = (widest - rw) // 2
+            row_h = max(sizes[i][1] for i in layer)
+            for i in layer:
+                w, h = sizes[i]
+                pos[i] = (x, y + (row_h - h) // 2, w, h)
+                x += w + gap_x
+            y += row_h + gap_y
+
+    def port(rect, side, slot, slots):
+        x, y, w, h = rect
+        t = (slot + 1) / (slots + 1)
+        if side == "bottom":
+            return int(x + w * t), y + h
+        if side == "top":
+            return int(x + w * t), y
+        if side == "right":
+            return x + w, int(y + h * t)
+        return x, int(y + h * t)
+
+    pair_slots: dict[tuple, list] = {}
+    target_slots: dict[str, list] = {}
+    for a in arrows:
+        pair_slots.setdefault((a["from"], a["to"]), []).append(a["id"])
+        if depth.get(a["to"], 0) > depth.get(a["from"], 0):
+            target_slots.setdefault(a["to"], []).append(a["id"])
+
+    def geometry(a, slot, slots):
+        frm, to = a["from"], a["to"]
+        df = depth.get(to, 0) - depth.get(frm, 0)
+        back = df < 0
+        skip = df > 1
+        same = df == 0
+        shift = 0
+        if direction == "LR":
+            if df > 0 or same:
+                sides = ("right", "left")
+            else:
+                sides = ("left", "right")
+            bend = back or skip or same
+        elif skip:
+            sides = ("left", "left")
+            bend = True
+        elif same:
+            sides = ("right", "left") if pos[to][0] >= pos[frm][0] else ("left", "right")
+            bend = True
+        elif back:
+            sides = ("top", "bottom")
+            bend = False
+            shift = 22
+        else:
+            sides = ("bottom", "top")
+            bend = False
+        x1, y1 = port(pos[frm], sides[0], slot, slots)
+        x2, y2 = port(pos[to], sides[1], slot, slots)
+        x1 += shift
+        x2 += shift
+        if bend:
+            offset = 96
+            if sides[0] == "left":
+                cx, cy = min(x1, x2) - offset, (y1 + y2) // 2
+            elif sides[0] == "right" and back:
+                cx, cy = max(x1, x2) + offset, (y1 + y2) // 2
+            elif sides[0] in ("top", "bottom") and direction == "LR":
+                cx, cy = (x1 + x2) // 2, min(y1, y2) - offset
+            else:
+                cx, cy = max(x1, x2) + offset, (y1 + y2) // 2
+            lx, ly = cx, cy
+        elif back:
+            cx = cy = None
+            lx = int(x1 * 0.22 + x2 * 0.78) - 58
+            ly = int(y1 * 0.22 + y2 * 0.78)
+        else:
+            cx = cy = None
+            mates_in = target_slots.get(to) or [a["id"]]
+            nslot = mates_in.index(a["id"]) if a["id"] in mates_in else 0
+            lx = pos[to][0] + pos[to][2] // 2
+            ly = pos[to][1] - 24 - nslot * 18
+        return x1, y1, x2, y2, bend, cx, cy, lx, ly
+
+    drawn = []
+    xs = [0]
+    ys = [0]
+    for b in boxes:
+        x, y, w, h = pos[b["id"]]
+        xs.extend((x, x + w))
+        ys.extend((y, y + h))
+    rank = {"normal": 0, "branch": 0, "query": 1, "optional": 2, "failure": 3}
+    for a in sorted(arrows, key=lambda a: (rank.get(_kind(a), 1), a.get("id") or "")):
+        mates = pair_slots.get((a["from"], a["to"]), [a["id"]])
+        slot = mates.index(a["id"]) if a["id"] in mates else 0
+        x1, y1, x2, y2, bend, cx, cy, lx, ly = geometry(a, slot, len(mates))
+        kind = _kind(a)
+        if kind == "failure":
+            color = "#9a3412"
+        elif _is_dashed(a) or kind == "optional":
+            color = "#57534e"
+        else:
+            color = "#1c1b18"
+        xs.extend((x1, x2, lx))
+        ys.extend((y1, y2, ly))
+        if bend and cx is not None:
+            xs.append(cx)
+            ys.append(cy)
+        action = _shown_action(a)
+        if action:
+            tw = int(len(action) * 6.5) + 10
+            drawn.append(
+                (
+                    lx,
+                    ly,
+                    tw,
+                    color,
+                    html.escape(action),
+                    "700" if kind == "failure" else "400",
+                )
+            )
+            xs.extend((lx - tw // 2, lx + tw // 2))
+            ys.extend((ly - 14, ly + 4))
+
+    failures = _failure_rows(view)
+    min_x = min(xs)
+    min_y = min(ys)
+    max_x = max(xs)
+    max_y = max(ys)
+    dx = 28 - min_x
+    dy = 52 - min_y
+    width = max_x + dx + 28
+    cap_h = (22 + 20 * len(failures)) if failures else 0
+    height = max_y + dy + 28 + cap_h
+
+    def sx(v):
+        return int(v + dx)
+
+    def sy(v):
+        return int(v + dy)
+
+    body = []
+    body.append(
+        f'<text x="{width // 2}" y="32" text-anchor="middle" font-size="18" fill="#1c1b18">{html.escape(view.get("title") or "")}</text>'
+    )
+    for layer in layers:
+        i = 0
+        while i < len(layer):
+            group = (by_id[layer[i]].get("group") or "").strip()
+            j = i + 1
+            while group and j < len(layer) and (by_id[layer[j]].get("group") or "").strip() == group:
+                j += 1
+            if group:
+                rects = [pos[k] for k in layer[i:j]]
+                gx = min(r[0] for r in rects) - 10
+                gy = min(r[1] for r in rects) - 18
+                gw = max(r[0] + r[2] for r in rects) - gx + 10
+                gh = max(r[1] + r[3] for r in rects) - gy + 10
+                body.append(
+                    f'<rect x="{sx(gx)}" y="{sy(gy)}" width="{gw}" height="{gh}" rx="8" fill="#e7e1d4" stroke="#d8d2c4"/>'
+                )
+                body.append(
+                    f'<text x="{sx(gx + 8)}" y="{sy(gy + 12)}" font-size="11" fill="#5e5a52">{html.escape(group)}</text>'
+                )
+            i = j if group else i + 1
+    for b in boxes:
+        x, y, w, h = pos[b["id"]]
+        x, y = sx(x), sy(y)
+        label = html.escape(b.get("label") or b["id"])
+        note = html.escape((b.get("note") or "").strip())
+        shape = b.get("shape") or "box"
+        if shape == "decision":
+            cx, cy = x + w // 2, y + h // 2
+            pts = f"{cx},{y} {x + w},{cy} {cx},{y + h} {x},{cy}"
+            body.append(
+                f'<polygon points="{pts}" fill="#fffcf6" stroke="#1c1b18" stroke-width="1.5"/>'
+            )
+        else:
+            rx = 16 if shape == "round" else 6
+            extra = ' stroke-dasharray="4 3"' if shape == "note" else ""
+            body.append(
+                f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="#fffcf6" stroke="#1c1b18" stroke-width="1.5"{extra}/>'
+            )
+        if note:
+            body.append(
+                f'<text x="{x + w // 2}" y="{y + h // 2 - 2}" text-anchor="middle" font-size="14" fill="#1c1b18">{label}</text>'
+            )
+            body.append(
+                f'<text x="{x + w // 2}" y="{y + h // 2 + 16}" text-anchor="middle" font-size="11" fill="#5e5a52">{note}</text>'
+            )
+        else:
+            body.append(
+                f'<text x="{x + w // 2}" y="{y + h // 2 + 5}" text-anchor="middle" font-size="14" fill="#1c1b18">{label}</text>'
+            )
+    for a in sorted(arrows, key=lambda a: (rank.get(_kind(a), 1), a.get("id") or "")):
+        mates = pair_slots.get((a["from"], a["to"]), [a["id"]])
+        slot = mates.index(a["id"]) if a["id"] in mates else 0
+        x1, y1, x2, y2, bend, cx, cy, _lx, _ly = geometry(a, slot, len(mates))
+        x1, y1, x2, y2 = sx(x1), sy(y1), sx(x2), sy(y2)
+        kind = _kind(a)
+        if kind == "failure":
+            color, stroke_w, dash, mid = "#9a3412", "3", "7 4", "fail"
+        elif _is_dashed(a) or kind == "optional":
+            color, stroke_w, dash, mid = "#57534e", "1.8", "5 4", "opt"
+        else:
+            color, stroke_w, dash, mid = "#1c1b18", "1.6", None, "norm"
+        if bend and cx is not None:
+            path = f"M {x1} {y1} Q {sx(cx)} {sy(cy)} {x2} {y2}"
+        else:
+            path = f"M {x1} {y1} L {x2} {y2}"
+        dash_attr = f' stroke-dasharray="{dash}"' if dash else ""
+        body.append(
+            f'<path d="{path}" fill="none" stroke="{color}" stroke-width="{stroke_w}"{dash_attr} marker-end="url(#ah-{mid})"/>'
+        )
+    for lx, ly, tw, color, text, weight in drawn:
+        lx, ly = sx(lx), sy(ly)
+        body.append(
+            f'<rect x="{lx - tw // 2}" y="{ly - 12}" width="{tw}" height="16" rx="3" fill="#f4f0e7"/>'
+        )
+        body.append(
+            f'<text x="{lx}" y="{ly}" text-anchor="middle" font-size="12" font-weight="{weight}" fill="{color}">{text}</text>'
+        )
+    if failures:
+        fy = height - cap_h + 8
+        body.append(
+            f'<text x="28" y="{fy}" font-size="14" font-weight="700" fill="#9a3412">Failure</text>'
+        )
+        for n, row in enumerate(failures):
+            body.append(
+                f'<text x="28" y="{fy + 20 + 20 * n}" font-size="13" fill="#9a3412">{html.escape(row)}</text>'
+            )
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" font-family="Georgia, Palatino, serif">',
+        f'<rect width="{width}" height="{height}" fill="#f4f0e7"/>',
+        '<defs>',
+        '<marker id="ah-norm" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#1c1b18"/></marker>',
+        '<marker id="ah-opt" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#57534e"/></marker>',
+        '<marker id="ah-fail" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#9a3412"/></marker>',
+        "</defs>",
+        *body,
+        "</svg>",
+        "",
+    ]
+    return "\n".join(parts)
+
+
 def render(model: dict, lens: dict, fmt: str, templates_dir: Path | None = None) -> str:
     view = apply_lens(model, lens)
+    if fmt == "svg":
+        return svg_document(view)
+    if fmt == "structure":
+        return structure_json(view)
     tmpl, path = load_template(fmt, templates_dir)
     ctx = build_context(view)
     escape = fmt in ("html", "html-tabs") or path.name.endswith(".html.tmpl") or "html" in path.stem
@@ -1748,14 +2316,33 @@ def scaffold_model() -> dict:
     return {
         "title": "Title of the path",
         "goal": "One sentence: who does what, and what is shown at the end.",
+        "audience": "engineer-new",
         "boxes": [
-            {"id": "start", "label": "Start", "level": 1},
-            {"id": "middle", "label": "Middle", "level": 1},
-            {"id": "end", "label": "End", "level": 1},
+            {"id": "start", "label": "User phone", "level": 1},
+            {"id": "middle", "label": "Report page", "level": 1},
+            {"id": "end", "label": "Map page", "level": 1},
         ],
         "arrows": [
-            {"id": "a1", "from": "start", "to": "middle", "label": "what moves", "step": 1, "kind": "normal"},
-            {"id": "a2", "from": "middle", "to": "end", "label": "the result", "step": 2, "kind": "normal"},
+            {
+                "id": "a1",
+                "from": "start",
+                "to": "middle",
+                "label": "sends a photo",
+                "actor": "user",
+                "action": "sends a photo",
+                "step": 1,
+                "kind": "normal",
+            },
+            {
+                "id": "a2",
+                "from": "middle",
+                "to": "end",
+                "label": "shows the report",
+                "actor": "page",
+                "action": "shows the report",
+                "step": 2,
+                "kind": "normal",
+            },
         ],
         "steps": [
             {"n": 1, "arrow": "a1", "text": "Short one-line step.", "level": 1},
@@ -1779,10 +2366,38 @@ def _print_issues(issues: list[Issue], stream) -> None:
         print(str(iss), file=stream)
 
 
-def _run_check(model_path: Path, lens: dict, common: set[str], stream=None) -> list[Issue]:
+def format_collapse_plan(model: dict, lens: dict) -> str:
+    note = apply_lens(model, lens)["collapse_note"]
+    collapsed = ", ".join(note["collapsed"]) if note["collapsed"] else "(none)"
+    lines = [
+        f"lens {lens.get('id')}:",
+        "  kept: " + ", ".join(note["kept"]),
+        "  collapsed: " + collapsed,
+    ]
+    if note["hidden"]:
+        lines.append("  hidden: " + ", ".join(note["hidden"]))
+    return "\n".join(lines)
+
+
+def format_all_collapse_plans(model: dict) -> str:
+    return "\n".join(format_collapse_plan(model, load_lens(lid)) for lid in list_lenses())
+
+
+def default_lens_id(model: dict) -> str:
+    aud = model.get("audience")
+    if isinstance(aud, str) and aud.strip():
+        candidate = aud.strip()
+        if (ROOT / "lenses" / f"{candidate}.yaml").exists() or Path(candidate).exists():
+            return candidate
+    return "engineer-new"
+
+
+def _run_check(model_path: Path, lens: dict, common: set[str], stream=None, audience: str | None = None) -> list[Issue]:
     stream = stream or sys.stdout
     model = load_model(model_path)
-    issues = check(model, lens, common)
+    print(format_all_collapse_plans(model), file=stream)
+    lens = _bind_audience(lens, audience)
+    issues = check(model, lens, common, audience)
     view = apply_lens(model, lens)
     errs = errors_only(issues)
     warns = [i for i in issues if i.level == "warn"]
@@ -1838,6 +2453,7 @@ def main(argv: list[str] | None = None) -> int:
     p_check = sub.add_parser("check", help="Run schema, gap, limit, and vocabulary checks.")
     p_check.add_argument("model", type=Path)
     p_check.add_argument("--lens", required=True, help="Lens id or path to a YAML lens.")
+    p_check.add_argument("--audience", default=None, help="Key in model audiences whose terms are allowed.")
 
     p_suggest = sub.add_parser(
         "suggest",
@@ -1845,17 +2461,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_suggest.add_argument("model", type=Path)
     p_suggest.add_argument("--lens", required=True)
+    p_suggest.add_argument("--audience", default=None)
     p_suggest.add_argument("--synonyms", type=Path, default=None)
 
     # lint is an alias
     p_lint = sub.add_parser("lint", help="Same as check, then suggest replacements.")
     p_lint.add_argument("model", type=Path)
     p_lint.add_argument("--lens", required=True)
+    p_lint.add_argument("--audience", default=None)
     p_lint.add_argument("--synonyms", type=Path, default=None)
 
     p_render = sub.add_parser("render", help="Render a model through a lens and a template.")
     p_render.add_argument("model", type=Path)
     p_render.add_argument("--lens", default=None)
+    p_render.add_argument("--audience", default=None)
     p_render.add_argument(
         "--format",
         dest="fmt",
@@ -1902,6 +2521,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: model not found: {args.model}", file=sys.stderr)
             return 2
         model = load_model(args.model)
+        print(format_all_collapse_plans(model), file=sys.stderr)
         out_dir = args.output or Path("out")
         if out_dir.exists() and out_dir.is_file():
             print("error: --all expects -o to be a directory", file=sys.stderr)
@@ -1918,7 +2538,9 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
         for lens in lenses:
             for fmt in ("md", "html"):
-                text, code = _render_checked(model, lens, fmt, args.force, common)
+                text, code = _render_checked(
+                    model, _bind_audience(lens, args.audience), fmt, args.force, common
+                )
                 if text is None:
                     rc = code or rc
                     continue
@@ -1939,6 +2561,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"note: {exc}", file=sys.stderr)
         return rc
 
+    if args.cmd == "render" and not args.lens:
+        if not args.model.exists():
+            print(f"error: model not found: {args.model}", file=sys.stderr)
+            return 2
+        args.lens = default_lens_id(load_model(args.model))
+
     # Commands that need a single lens
     try:
         lens = load_lens(args.lens)
@@ -1950,15 +2578,15 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.cmd == "check":
-        issues = _run_check(args.model, lens, common)
+        issues = _run_check(args.model, lens, common, audience=getattr(args, "audience", None))
         return 1 if errors_only(issues) else 0
 
     if args.cmd in ("suggest", "lint"):
         if args.cmd == "lint":
-            issues = _run_check(args.model, lens, common)
+            issues = _run_check(args.model, lens, common, audience=getattr(args, "audience", None))
         model = load_model(args.model)
         syn = load_synonyms(args.synonyms) if getattr(args, "synonyms", None) else load_synonyms()
-        lines = suggest(model, lens, common, syn)
+        lines = suggest(model, lens, common, syn, audience=getattr(args, "audience", None))
         if lines:
             print("suggestions:")
             for ln in lines:
@@ -1970,12 +2598,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "render":
-        if not args.fmt:
-            print("error: --format is required (or use --all)", file=sys.stderr)
-            return 2
         model = load_model(args.model)
+        if not args.fmt:
+            args.fmt = "md"
+        print(format_all_collapse_plans(model), file=sys.stderr)
+        lens = _bind_audience(lens, args.audience)
         if args.fmt == "html-tabs":
-            issues = check(model, lens, common)
+            issues = check(model, lens, common, args.audience)
             if errors_only(issues) and not args.force:
                 print("FAIL  refusing to render; pass --force to override", file=sys.stderr)
                 _print_issues(issues, sys.stderr)

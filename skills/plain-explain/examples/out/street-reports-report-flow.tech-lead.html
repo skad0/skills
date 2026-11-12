@@ -58,6 +58,10 @@
     min-height: 12rem;
   }
   .diagram .mermaid { margin: 0; background: transparent; }
+  table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+  caption { text-align: left; font-weight: 650; margin: 0 0 0.35rem; }
+  td { border: 1px solid var(--line); padding: 0.35rem 0.6rem; }
+  table.failures caption { color: #9a3412; }
 </style>
 </head>
 <body>
@@ -66,9 +70,9 @@
   <p class="lens">For: Tech lead</p>
   <div class="diagram">
     <pre class="mermaid">flowchart TB
-  client["Client"]
-  service["Service"]
-  storage["Storage"]
+  client["User"]
+  service["Report server"]
+  storage["Photo files"]
   map["Map page"]
   held["Not public"]
   client -->|"1. new report"| service
@@ -78,12 +82,17 @@
   service -.->|"not public"| held
   client -.->|"via Telegram"| service</pre>
   </div>
-  <p class="goal"><strong>Goal.</strong> A user sends a photo of a street problem, and the report is shown on a public map.</p>
-  <ul>
-    <li>Public only after a safe photo: failure means never shown, and not at once.</li>
-    <li>Originals stay private; cost is two files and a worker.</li>
-    <li>Photo check is an outside service; form, photo work, and map share one place.</li>
-  </ul>
+  <table class="failures">
+    <caption>Failure</caption>
+    <tr><td>Report server → Not public: not public</td></tr>
+  </table>
+  <p class="goal"><strong>Goal.</strong> A user sends a street photo and the map shows the report.</p>
+  <table>
+    <caption>Tradeoffs and failure points</caption>
+    <tr><td>Public only after a safe photo.</td></tr>
+    <tr><td>Originals stay private; two files and a worker.</td></tr>
+    <tr><td>Photo check is an outside service.</td></tr>
+  </table>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>

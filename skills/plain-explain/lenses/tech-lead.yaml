@@ -33,7 +33,8 @@ show_steps: false
 show_glossary: false
 show_skipped: false
 direction: TB
-max_prose_words: 80
+max_prose_words: 50
+max_sentences_per_step: 1
 max_arrow_words: 5
 max_words_per_step: 20
 max_sentence_words: 20
@@ -43,5 +44,5 @@ closing_section:
   field: tradeoffs
   contains: At most three short bullets on cost, scale, dependencies, and failure.
 tone: >
-  Big boxes (client, service, storage, map). Tradeoffs and failures
-  in the picture (dashed arrows) and in three short bullets. No step list.
+  Coarse boxes named for real parts, such as the user's phone, the report
+  server, and the files. Failures stay on dashed arrows. No step list.

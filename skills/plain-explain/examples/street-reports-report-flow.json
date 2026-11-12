@@ -7,11 +7,12 @@
     "Telegram is an optional intake into the same store path. The web-form place-range check is unverified."
   ],
   "title": "From a phone to the map",
-  "goal": "A user sends a photo of a street problem, and the report is shown on a public map.",
+  "audience": "engineer-new",
+  "goal": "A user sends a street photo and the map shows the report.",
   "boxes": [
     {
       "id": "phone",
-      "label": "Phone",
+      "label": "User phone",
       "level": 1,
       "collapse_to": "client"
     },
@@ -23,20 +24,20 @@
     },
     {
       "id": "client",
-      "label": "Client",
+      "label": "User",
       "level": 2,
       "aggregate": true
     },
     {
       "id": "server",
-      "label": "Server",
+      "label": "Report server",
       "level": 3,
       "collapse_to": "service",
       "note": "one process"
     },
     {
       "id": "service",
-      "label": "Service",
+      "label": "Report server",
       "level": 2,
       "aggregate": true
     },
@@ -45,18 +46,18 @@
       "label": "Photo files",
       "level": 3,
       "collapse_to": "storage",
-      "group": "Storage"
+      "group": "Files"
     },
     {
       "id": "database",
-      "label": "Database",
+      "label": "Report records",
       "level": 3,
       "collapse_to": "storage",
-      "group": "Storage"
+      "group": "Files"
     },
     {
       "id": "storage",
-      "label": "Storage",
+      "label": "Photo files",
       "level": 2,
       "aggregate": true
     },
@@ -78,7 +79,9 @@
       "to": "page",
       "label": "photo and place",
       "step": 1,
-      "kind": "normal"
+      "kind": "normal",
+      "actor": "user",
+      "action": "photo and place"
     },
     {
       "id": "a_send",
@@ -86,7 +89,9 @@
       "to": "server",
       "label": "new report",
       "step": 2,
-      "kind": "normal"
+      "kind": "normal",
+      "actor": "user",
+      "action": "new report"
     },
     {
       "id": "a_original",
@@ -94,7 +99,9 @@
       "to": "photos",
       "label": "original",
       "step": 7,
-      "kind": "normal"
+      "kind": "normal",
+      "actor": "server",
+      "action": "original"
     },
     {
       "id": "a_record",
@@ -102,7 +109,9 @@
       "to": "database",
       "label": "record",
       "step": 8,
-      "kind": "normal"
+      "kind": "normal",
+      "actor": "server",
+      "action": "record"
     },
     {
       "id": "a_blur",
@@ -110,7 +119,9 @@
       "to": "photos",
       "label": "safe photo",
       "step": 9,
-      "kind": "normal"
+      "kind": "normal",
+      "actor": "worker",
+      "action": "safe photo"
     },
     {
       "id": "a_ask",
@@ -118,7 +129,9 @@
       "to": "server",
       "label": "request",
       "step": 10,
-      "kind": "query"
+      "kind": "query",
+      "actor": "map",
+      "action": "request"
     },
     {
       "id": "a_return",
@@ -126,21 +139,27 @@
       "to": "map",
       "label": "public reports",
       "step": 11,
-      "kind": "normal"
+      "kind": "normal",
+      "actor": "server",
+      "action": "public reports"
     },
     {
       "id": "a_held",
       "from": "server",
       "to": "held",
       "label": "not public",
-      "kind": "failure"
+      "kind": "failure",
+      "actor": "server",
+      "action": "not public"
     },
     {
       "id": "a_telegram",
       "from": "phone",
       "to": "server",
       "label": "via Telegram",
-      "kind": "optional"
+      "kind": "optional",
+      "actor": "user",
+      "action": "via Telegram"
     }
   ],
   "steps": [
@@ -184,59 +203,59 @@
       "n": 6,
       "arrow": "a_open",
       "level": 3,
-      "text": "The user sends a photo and a place from the report page."
+      "text": "The user sends a photo and a place."
     },
     {
       "n": 7,
       "arrow": "a_send",
       "level": 3,
-      "text": "The report page sends a new report to the server."
+      "text": "The page sends the report to the server."
     },
     {
       "n": 8,
       "arrow": "a_original",
       "level": 3,
-      "text": "The server stores the original photo as a private file."
+      "text": "The server stores the original photo."
     },
     {
       "n": 9,
       "arrow": "a_record",
       "level": 3,
-      "text": "The server writes a report record."
+      "text": "The server writes a record."
     },
     {
       "n": 10,
       "arrow": "a_blur",
       "level": 3,
-      "text": "A worker blurs faces and plates and stores the safe photo."
+      "text": "A worker blurs faces and plates."
     },
     {
       "n": 11,
       "arrow": "a_ask",
       "level": 3,
-      "text": "The map page asks the server for public reports."
+      "text": "The map asks for public reports."
     },
     {
       "n": 12,
       "arrow": "a_return",
       "level": 3,
-      "text": "The server returns public reports; the map shows them."
+      "text": "The server returns the public reports."
     }
   ],
   "risks": [
-    "If blur does not work or the photo is graphic, the report is not public.",
+    "If blur does not work, the report is not public.",
     "If there is no place, the server returns an error.",
     "Many flags take a report off the map."
   ],
   "user_impact": [
     "No account is needed.",
-    "Not shown at once: faces and plates are made hard to read first.",
+    "Faces and plates are hidden first.",
     "A photo not fit for public is not shown."
   ],
   "tradeoffs": [
-    "Public only after a safe photo: failure means never shown, and not at once.",
-    "Originals stay private; cost is two files and a worker.",
-    "Photo check is an outside service; form, photo work, and map share one place."
+    "Public only after a safe photo.",
+    "Originals stay private; two files and a worker.",
+    "Photo check is an outside service."
   ],
   "glossary": [
     {

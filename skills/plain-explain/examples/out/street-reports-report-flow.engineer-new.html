@@ -58,6 +58,10 @@
     min-height: 12rem;
   }
   .diagram .mermaid { margin: 0; background: transparent; }
+  table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+  caption { text-align: left; font-weight: 650; margin: 0 0 0.35rem; }
+  td { border: 1px solid var(--line); padding: 0.35rem 0.6rem; }
+  table.failures caption { color: #9a3412; }
 </style>
 </head>
 <body>
@@ -66,12 +70,12 @@
   <p class="lens">For: New engineer</p>
   <div class="diagram">
     <pre class="mermaid">flowchart TB
-  phone["Phone"]
+  phone["User phone"]
   page["Report page"]
-  server["Server (one process)"]
-  subgraph g_Storage["Storage"]
+  server["Report server (one process)"]
+  subgraph g_Files["Files"]
     photos["Photo files"]
-    database["Database"]
+    database["Report records"]
   end
   map["Map page"]
   held["Not public"]
@@ -85,20 +89,25 @@
   server -.->|"not public"| held
   phone -.->|"via Telegram"| server</pre>
   </div>
-  <p class="goal"><strong>Goal.</strong> A user sends a photo of a street problem, and the report is shown on a public map.</p>
-  <ul>
-    <li>If blur does not work or the photo is graphic, the report is not public.</li>
-    <li>If there is no place, the server returns an error.</li>
-    <li>Many flags take a report off the map.</li>
-  </ul>
+  <table class="failures">
+    <caption>Failure</caption>
+    <tr><td>Report server → Not public: not public</td></tr>
+  </table>
+  <p class="goal"><strong>Goal.</strong> A user sends a street photo and the map shows the report.</p>
+  <table>
+    <caption>What can go wrong</caption>
+    <tr><td>If blur does not work, the report is not public.</td></tr>
+    <tr><td>If there is no place, the server returns an error.</td></tr>
+    <tr><td>Many flags take a report off the map.</td></tr>
+  </table>
   <ol>
-    <li>The user sends a photo and a place from the report page.</li>
-    <li>The report page sends a new report to the server.</li>
-    <li>The server stores the original photo as a private file.</li>
-    <li>The server writes a report record.</li>
-    <li>A worker blurs faces and plates and stores the safe photo.</li>
-    <li>The map page asks the server for public reports.</li>
-    <li>The server returns public reports; the map shows them.</li>
+    <li>The user sends a photo and a place.</li>
+    <li>The page sends the report to the server.</li>
+    <li>The server stores the original photo.</li>
+    <li>The server writes a record.</li>
+    <li>A worker blurs faces and plates.</li>
+    <li>The map asks for public reports.</li>
+    <li>The server returns the public reports.</li>
   </ol>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
