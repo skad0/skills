@@ -2,16 +2,7 @@ id: engineer-new
 name: New engineer
 extends: base
 allowed_terms:
-  - worker
-  - storage
-  - original
   - severity
-  - graphic
-  - blur
-  - plate
-  - face
-  - hold
-  - service
 max_boxes: 7
 min_boxes: 3
 max_steps: 10

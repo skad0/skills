@@ -623,30 +623,127 @@ def _seg_hits_rect(x1, y1, x2, y2, rect) -> bool:
     return False
 
 
+def _path_midpoint(d: str):
+    nums = [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", d)]
+    if "Q" in d:
+        x1, y1, cx, cy, x2, y2 = nums[:6]
+        return (0.25 * x1 + 0.5 * cx + 0.25 * x2, 0.25 * y1 + 0.5 * cy + 0.25 * y2)
+    return ((nums[0] + nums[-2]) / 2, (nums[1] + nums[-1]) / 2)
+
+
+def _svg_picture(svg: str):
+    root = ET.fromstring(svg)
+    ns = "{http://www.w3.org/2000/svg}"
+    labels = []
+    for el in root.iter(ns + "rect"):
+        if el.get("fill") == "#f4f0e7" and el.get("height") == "16":
+            labels.append(
+                (float(el.get("x")), float(el.get("y")), float(el.get("width")), float(el.get("height")))
+            )
+    texts = [
+        (float(el.get("x")), float(el.get("y")) - 4)
+        for el in root.iter(ns + "text")
+        if el.get("font-size") == "12"
+    ]
+    paths = []
+    for el in root.iter(ns + "path"):
+        if not el.get("stroke"):
+            continue
+        d = el.get("d")
+        paths.append((_path_midpoint(d), _svg_segments(d)))
+    return labels, texts, paths
+
+
 class SvgLayout(unittest.TestCase):
     def test_labels_do_not_cover_lines_or_each_other(self):
-        model = pe.load_model(EXAMPLE)
-        svg = pe.render(model, pe.load_lens("engineer-new"), "svg")
-        root = ET.fromstring(svg)
-        ns = "{http://www.w3.org/2000/svg}"
-        labels = []
-        for el in root.iter(ns + "rect"):
-            if el.get("fill") == "#f4f0e7" and el.get("height") == "16":
-                labels.append(
-                    (float(el.get("x")), float(el.get("y")), float(el.get("width")), float(el.get("height")))
-                )
+        svg = pe.render(pe.load_model(EXAMPLE), pe.load_lens("engineer-new"), "svg")
+        labels, texts, paths = _svg_picture(svg)
         self.assertGreaterEqual(len(labels), 4)
+        self.assertEqual(len(labels), len(texts))
         for i, a in enumerate(labels):
             for b in labels[i + 1 :]:
                 self.assertFalse(_rects_overlap(a, b), (a, b))
-        segments = []
-        for el in root.iter(ns + "path"):
-            if not el.get("stroke"):
-                continue
-            segments.extend(_svg_segments(el.get("d")))
-        for rect in labels:
-            for (x1, y1), (x2, y2) in segments:
-                self.assertFalse(_seg_hits_rect(x1, y1, x2, y2, rect), rect)
+        for rect, (cx, cy) in zip(labels, texts):
+            own = min(range(len(paths)), key=lambda k: ((cx - paths[k][0][0]) ** 2 + (cy - paths[k][0][1]) ** 2) ** 0.5)
+            for k, (_mid, segments) in enumerate(paths):
+                if k == own:
+                    continue
+                for (x1, y1), (x2, y2) in segments:
+                    self.assertFalse(_seg_hits_rect(x1, y1, x2, y2, rect), rect)
+
+    def test_each_label_sits_near_its_arrow(self):
+        svg = pe.render(pe.load_model(EXAMPLE), pe.load_lens("engineer-new"), "svg")
+        _labels, texts, paths = _svg_picture(svg)
+        self.assertEqual(len(texts), len(paths))
+        for mx, my in (mid for mid, _segs in paths):
+            dist = min(((cx - mx) ** 2 + (cy - my) ** 2) ** 0.5 for cx, cy in texts)
+            self.assertLess(dist, 76, (mx, my, dist))
+
+
+class DuplicateParts(unittest.TestCase):
+    def _picture(self):
+        return _model(
+            title="A photo",
+            goal="A user sends a photo.",
+            legend="",
+            boxes=[
+                {"id": "phone", "label": "Phone", "level": 1},
+                {"id": "again", "label": "Phone", "level": 1},
+                {"id": "page", "label": "Page", "level": 1},
+                {"id": "map", "label": "Map", "level": 1},
+            ],
+            arrows=[
+                {
+                    "id": "go",
+                    "from": "phone",
+                    "to": "page",
+                    "label": "photo",
+                    "actor": "user",
+                    "action": "sends photo",
+                    "kind": "normal",
+                },
+                {
+                    "id": "go2",
+                    "from": "phone",
+                    "to": "page",
+                    "label": "photo",
+                    "actor": "user",
+                    "action": "sends photo",
+                    "kind": "normal",
+                },
+                {
+                    "id": "same",
+                    "from": "page",
+                    "to": "map",
+                    "label": "report",
+                    "actor": "user",
+                    "action": "sends photo",
+                    "kind": "normal",
+                },
+            ],
+            steps=[
+                {"n": 1, "arrow": "go", "text": "The user sends a photo.", "level": 1},
+                {"n": 2, "arrow": "same", "text": "The page shows the report.", "level": 1},
+            ],
+            user_impact=["The photo is not public."],
+            risks=[],
+            tradeoffs=[],
+        )
+
+    def test_check_warns_and_svg_draws_once(self):
+        model = self._picture()
+        warns = [i for i in _issues(model, "product") if i.kind == "duplicates"]
+        blob = "\n".join(i.message for i in warns)
+        self.assertIn("repeats the label", blob)
+        self.assertIn("repeats the edge", blob)
+        self.assertIn("repeats the actor and action", blob)
+        svg = pe.render(model, pe.load_lens("product"), "svg")
+        root = ET.fromstring(svg)
+        ns = "{http://www.w3.org/2000/svg}"
+        box_labels = [el.text for el in root.iter(ns + "text") if el.get("font-size") == "14" and el.text == "Phone"]
+        self.assertEqual(box_labels, ["Phone"])
+        strokes = [el for el in root.iter(ns + "path") if el.get("stroke")]
+        self.assertEqual(len(strokes), 2)
 
 
 class FailureLine(unittest.TestCase):

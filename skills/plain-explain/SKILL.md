@@ -54,7 +54,7 @@ python3 explain.py check path/to/model.json --lens engineer-new
 python3 explain.py lint path/to/model.json --lens engineer-new
 ```
 
-`check` prints, for every lens, which boxes are kept and which collapse into which, before the verdict. Then vocabulary, gaps, and limits. It warns on abstract labels (`Export step`, `Service`, `Renderer`, `data`) and on an arrow with no actor or action. A step whose level this lens filters out does not become a bare "step not reached": the hop still counts when its arrow stays visible, and otherwise the error names the lens, the step, and the level. A collapse under `min_boxes` warns that the picture is below a useful size. Non-zero exit only for errors.
+`check` prints, for every lens, which boxes are kept and which collapse into which, before the verdict. Then vocabulary, gaps, and limits. It warns on a repeated label, a repeated actor and action, or a repeated edge, and on abstract labels (`Export step`, `Service`, `Renderer`, `data`) or an arrow with no actor or action. A step whose level this lens filters out does not become a bare "step not reached": the hop still counts when its arrow stays visible, and otherwise the error names the lens, the step, and the level. A collapse under `min_boxes` warns that the picture is below a useful size. Non-zero exit only for errors.
 
 `lint` proposes replacements from `synonyms.txt`. For a leftover term, rewrite it, add it under `audiences`, or add a one-line glossary entry.
 

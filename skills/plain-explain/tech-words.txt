@@ -1,20 +1,7 @@
-# General tech words allowed for every audience. Not team names.
-# Case is ignored. Obscure jargon and undefined acronyms stay flagged.
-server
+# Tech words that are not already in common-words.txt.
+# server, browser, page, request, and the other everyday ones live there.
 cache
 API
-request
-response
-database
-browser
-page
-URL
-HTML
 queue
-log
-login
-client
 JSON
 token
-file
-error

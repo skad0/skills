@@ -30,27 +30,27 @@
 <path d="M 421 454 L 297 582" fill="none" stroke="#1c1b18" stroke-width="1.6" marker-end="url(#ah-norm)"/>
 <path d="M 443 454 L 498 582" fill="none" stroke="#1c1b18" stroke-width="1.6" marker-end="url(#ah-norm)"/>
 <path d="M 421 268 L 421 396" fill="none" stroke="#1c1b18" stroke-width="1.6" marker-end="url(#ah-norm)"/>
-<path d="M 512 582 L 457 454" fill="none" stroke="#1c1b18" stroke-width="1.6" marker-end="url(#ah-norm)"/>
+<path d="M 534 582 L 479 454" fill="none" stroke="#1c1b18" stroke-width="1.6" marker-end="url(#ah-norm)"/>
 <path d="M 353 74 Q 233 249 353 425" fill="none" stroke="#57534e" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#ah-opt)"/>
 <path d="M 466 454 L 722 582" fill="none" stroke="#9a3412" stroke-width="3" stroke-dasharray="7 4" marker-end="url(#ah-fail)"/>
-<rect x="440" y="173" width="146" height="16" rx="3" fill="#f4f0e7"/>
-<text x="513" y="185" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">user: photo and place</text>
-<rect x="432" y="345" width="114" height="16" rx="3" fill="#f4f0e7"/>
-<text x="489" y="357" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">user: new report</text>
-<rect x="116" y="469" width="114" height="16" rx="3" fill="#f4f0e7"/>
-<text x="173" y="481" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">server: original</text>
-<rect x="198" y="448" width="101" height="16" rx="3" fill="#f4f0e7"/>
-<text x="248" y="460" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">server: record</text>
-<rect x="81" y="487" width="127" height="16" rx="3" fill="#f4f0e7"/>
-<text x="144" y="499" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">worker: safe photo</text>
-<rect x="386" y="552" width="88" height="16" rx="3" fill="#f4f0e7"/>
-<text x="430" y="564" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">map: request</text>
-<rect x="496" y="439" width="153" height="16" rx="3" fill="#f4f0e7"/>
-<text x="572" y="451" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">server: public reports</text>
-<rect x="573" y="470" width="205" height="16" rx="3" fill="#f4f0e7"/>
-<text x="675" y="482" text-anchor="middle" font-size="12" font-weight="700" fill="#9a3412">server: Report held for review</text>
-<rect x="170" y="307" width="127" height="16" rx="3" fill="#f4f0e7"/>
-<text x="233" y="319" text-anchor="middle" font-size="12" font-weight="400" fill="#57534e">user: via Telegram</text>
+<rect x="324" y="152" width="146" height="16" rx="3" fill="#f4f0e7"/>
+<text x="397" y="164" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">user: photo and place</text>
+<rect x="340" y="324" width="114" height="16" rx="3" fill="#f4f0e7"/>
+<text x="397" y="336" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">user: new report</text>
+<rect x="210" y="531" width="114" height="16" rx="3" fill="#f4f0e7"/>
+<text x="267" y="543" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">server: original</text>
+<rect x="357" y="557" width="101" height="16" rx="3" fill="#f4f0e7"/>
+<text x="407" y="569" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">server: record</text>
+<rect x="151" y="487" width="127" height="16" rx="3" fill="#f4f0e7"/>
+<text x="214" y="499" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">worker: safe photo</text>
+<rect x="512" y="453" width="88" height="16" rx="3" fill="#f4f0e7"/>
+<text x="556" y="465" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">map: request</text>
+<rect x="352" y="528" width="153" height="16" rx="3" fill="#f4f0e7"/>
+<text x="428" y="540" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">server: public reports</text>
+<rect x="502" y="488" width="205" height="16" rx="3" fill="#f4f0e7"/>
+<text x="604" y="500" text-anchor="middle" font-size="12" font-weight="700" fill="#9a3412">server: Report held for review</text>
+<rect x="206" y="241" width="127" height="16" rx="3" fill="#f4f0e7"/>
+<text x="269" y="253" text-anchor="middle" font-size="12" font-weight="400" fill="#57534e">user: via Telegram</text>
 <text x="28" y="662" font-size="14" font-weight="700" fill="#9a3412">Failure</text>
 <text x="28" y="682" font-size="13" fill="#9a3412">Report held for review → Not shown on the map</text>
 </svg>

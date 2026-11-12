@@ -955,6 +955,17 @@ def apply_lens(model: dict, lens: dict) -> dict:
     # glossary is still used for vocab (terms allowed) even if not shown;
     # the view flag show_glossary controls rendering.
     legend = model.get("legend") or ""
+    authored = [
+        note
+        for note in _duplicate_notes(model.get("boxes") or [], model.get("arrows") or [])
+        if note[0].startswith("arrow") and "repeats the edge" in note[0]
+    ]
+    duplicates = authored + _duplicate_notes(visible_boxes, arrows)
+    seen_notes = set()
+    duplicates = [note for note in duplicates if not (note[0] in seen_notes or seen_notes.add(note[0]))]
+    visible_boxes, arrows, alias = _unique_picture(visible_boxes, arrows)
+    for s in steps:
+        s["arrow"] = alias.get(s["arrow"], s["arrow"])
     return {
         "title": model.get("title") or "",
         "goal": model.get("goal") or "",
@@ -977,6 +988,7 @@ def apply_lens(model: dict, lens: dict) -> dict:
         "allowed_terms": model.get("allowed_terms") if isinstance(model.get("allowed_terms"), list) else [],
         "collapse_note": collapse_note(model, lens, visible_ids),
         "steps_filtered": steps_filtered,
+        "duplicates": duplicates,
     }
 
 
@@ -1701,11 +1713,92 @@ def _actor_issues(model: dict, view: dict) -> list[Issue]:
     return issues
 
 
+def _duplicate_notes(boxes, arrows) -> list[tuple[str, str]]:
+    notes = []
+    seen_label = {}
+    for b in boxes:
+        key = _phrase_key(b.get("label") or "")
+        if not key:
+            continue
+        if key in seen_label:
+            notes.append(
+                (
+                    f"box {b.get('id')} repeats the label {b.get('label')!r} ({seen_label[key]})",
+                    f"boxes[{b.get('id')}]",
+                )
+            )
+        else:
+            seen_label[key] = b.get("id")
+    seen_part = {}
+    seen_edge = {}
+    for a in arrows:
+        actor = _phrase_key(a.get("actor") or "")
+        action = _phrase_key(a.get("action") or a.get("label") or "")
+        if actor and action:
+            part = (actor, action)
+            if part in seen_part:
+                notes.append(
+                    (
+                        f"arrow {a.get('id')} repeats the actor and action of {seen_part[part]}",
+                        f"arrows[{a.get('id')}]",
+                    )
+                )
+            else:
+                seen_part[part] = a.get("id")
+        edge = (a.get("from"), a.get("to"), _phrase_key(a.get("label") or ""))
+        if edge in seen_edge:
+            notes.append(
+                (
+                    f"arrow {a.get('id')} repeats the edge {a.get('from')} -> {a.get('to')} {a.get('label')!r}",
+                    f"arrows[{a.get('id')}]",
+                )
+            )
+        else:
+            seen_edge[edge] = a.get("id")
+    return notes
+
+
+def _unique_picture(boxes, arrows):
+    """One box per label, one arrow per from/to/label. Later copies are not drawn."""
+    kept_boxes = []
+    box_alias = {}
+    seen_label = {}
+    for b in boxes:
+        key = _phrase_key(b.get("label") or "") or b.get("id")
+        if key in seen_label:
+            box_alias[b["id"]] = seen_label[key]
+            continue
+        seen_label[key] = b["id"]
+        box_alias[b["id"]] = b["id"]
+        kept_boxes.append(b)
+    kept_arrows = []
+    arrow_alias = {}
+    seen_edge = set()
+    for a in arrows:
+        frm = box_alias.get(a.get("from"), a.get("from"))
+        to = box_alias.get(a.get("to"), a.get("to"))
+        if frm == to:
+            continue
+        edge = (frm, to, _phrase_key(a.get("label") or ""), _kind(a))
+        if edge in seen_edge:
+            arrow_alias[a["id"]] = next(k["id"] for k in kept_arrows if (k["from"], k["to"], _phrase_key(k.get("label") or ""), _kind(k)) == edge)
+            continue
+        seen_edge.add(edge)
+        drawn = dict(a)
+        drawn["from"] = frm
+        drawn["to"] = to
+        kept_arrows.append(drawn)
+        arrow_alias[a["id"]] = drawn["id"]
+    return kept_boxes, kept_arrows, arrow_alias
+
+
 def check(model: dict, lens: dict, common: set[str] | None = None, audience: str | None = None) -> list[Issue]:
     common = common if common is not None else load_common_words()
     lens = _bind_audience(lens, audience)
     issues = _schema_issues(model)
     view = apply_lens(model, lens)
+    for message, loc in view.get("duplicates") or []:
+        issues.append(Issue("duplicates", message, loc, level="warn"))
     issues.extend(_gap_issues(view))
     issues.extend(_limit_issues(view, lens))
     issues.extend(_vocab_issues(view, lens, common))
@@ -2130,11 +2223,11 @@ def _route_svg(boxes, arrows, pos, depth, direction, by_id):
             if direction == "TB":
                 ux, uy = port(pos[to], "bottom", oi, on)
                 lx, ly = port(pos[frm], "top", ii, inn)
-                x1, y1, x2, y2 = lx + 14, ly, ux + 14, uy
+                x1, y1, x2, y2 = lx + 36, ly, ux + 36, uy
             else:
                 ux, uy = port(pos[to], "right", oi, on)
                 lx, ly = port(pos[frm], "left", ii, inn)
-                x1, y1, x2, y2 = lx, ly + 14, ux, uy + 14
+                x1, y1, x2, y2 = lx, ly + 36, ux, uy + 36
         elif df > 1 or df < 0:
             if direction == "TB":
                 x1, y1 = port(pos[frm], "left", 0, 1)
@@ -2170,11 +2263,17 @@ def _route_svg(boxes, arrows, pos, depth, direction, by_id):
             }
         )
 
-    segments = [seg for route in routes for seg in route["segments"]]
+    def anchor(route):
+        x1, y1, x2, y2 = route["x1"], route["y1"], route["x2"], route["y2"]
+        if route["bend"]:
+            cx, cy = route["bend"]
+            return 0.25 * x1 + 0.5 * cx + 0.25 * x2, 0.25 * y1 + 0.5 * cy + 0.25 * y2, x2 - x1, y2 - y1
+        return (x1 + x2) / 2, (y1 + y2) / 2, x2 - x1, y2 - y1
+
     obstacles = []
     for b in boxes:
         x, y, w, h = pos[b["id"]]
-        obstacles.append((x - 6, y - 6, w + 12, h + 12))
+        obstacles.append((x - 4, y - 4, w + 8, h + 8))
     placed = []
     for route in sorted(routes, key=lambda r: (-len(r["text"]), r["id"])):
         text = route["text"]
@@ -2182,41 +2281,36 @@ def _route_svg(boxes, arrows, pos, depth, direction, by_id):
             route["label"] = None
             continue
         tw = int(len(text) * 6.5) + 10
-        x1, y1, x2, y2 = route["x1"], route["y1"], route["x2"], route["y2"]
-        dx, dy = x2 - x1, y2 - y1
+        mx, my, dx, dy = anchor(route)
+        route["mid"] = (mx, my)
         length = (dx * dx + dy * dy) ** 0.5 or 1.0
         px, py = -dy / length, dx / length
-        candidates = []
-        if route["df"] == 1:
-            tx, ty, bw, bh = pos[route["to"]]
-            if direction == "TB":
-                candidates.append((x2 - 12 - tw / 2, ty - 8))
-                candidates.append((x2 + 12 + tw / 2, ty - 8))
-                candidates.append((tx + bw / 2, ty - 26))
-            else:
-                candidates.append((tx + bw / 2, ty - 8))
-                candidates.append((tx + bw / 2, ty + bh + 20))
-        for t in (0.7, 0.35, 0.85, 0.2, 0.55):
-            mx = x1 + dx * t
-            my = y1 + dy * t
-            for dist in (28, 48, 68, 92, 120):
-                for sign in (1, -1):
-                    candidates.append((mx + px * sign * dist, my + py * sign * dist))
-        candidates.append((min(x1, x2) - tw / 2 - 28, (y1 + y2) / 2))
-        candidates.append((max(x1, x2) + tw / 2 + 28, (y1 + y2) / 2))
+        tx, ty = dx / length, dy / length
+        sign0 = 1 if route["df"] >= 0 else -1
+        others = [seg for other in routes if other is not route for seg in other["segments"]]
         chosen = None
-        for lx, ly in candidates:
-            rect = _label_rect(lx, ly, tw)
-            if any(_rects_overlap(rect, box) for box in obstacles):
-                continue
-            if any(_rects_overlap(rect, prev) for prev in placed):
-                continue
-            if any(_seg_hits_rect(a1, b1, a2, b2, rect) for (a1, b1), (a2, b2) in segments):
-                continue
-            chosen = (lx, ly, rect)
-            break
+        for along in (0, 32, -32, 56, -56):
+            for gap in (24, 46, 68):
+                for sign in (sign0, -sign0):
+                    cx = mx + tx * along + px * sign * gap
+                    cy = my + ty * along + py * sign * gap
+                    lx, ly = cx, cy + 4
+                    rect = _label_rect(lx, ly, tw)
+                    if any(_rects_overlap(rect, box) for box in obstacles):
+                        continue
+                    if any(_rects_overlap(rect, prev) for prev in placed):
+                        continue
+                    if any(_seg_hits_rect(a1, b1, a2, b2, rect) for (a1, b1), (a2, b2) in others):
+                        continue
+                    chosen = (lx, ly, rect)
+                    break
+                if chosen:
+                    break
+            if chosen:
+                break
         if chosen is None:
-            lx, ly = candidates[0]
+            lx = mx + px * sign0 * 24
+            ly = my + py * sign0 * 24 + 4
             chosen = (lx, ly, _label_rect(lx, ly, tw))
         placed.append(chosen[2])
         route["label"] = (chosen[0], chosen[1], tw, html.escape(text))

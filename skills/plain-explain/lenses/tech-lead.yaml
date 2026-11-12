@@ -2,26 +2,12 @@ id: tech-lead
 name: Tech lead
 extends: base
 allowed_terms:
-  - service
-  - cost
-  - risk
-  - scale
   - dependency
-  - storage
   - load
   - failure
   - limit
-  - privacy
   - tradeoff
   - fallback
-  - worker
-  - original
-  - graphic
-  - blur
-  - plate
-  - face
-  - hold
-  - staff
 max_boxes: 5
 min_boxes: 3
 max_steps: 6
