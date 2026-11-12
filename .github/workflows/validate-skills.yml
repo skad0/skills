@@ -17,3 +17,4 @@ jobs:
           python-version: "3.12"
       - run: python3 -m pip install pyyaml==6.0.3
       - run: python3 scripts/validate_skills.py
+      - run: sh skills/plain-explain/tests/run.sh

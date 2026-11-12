@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{title}}</title>
+<style>
+  :root {
+    --fg: #1c1b18;
+    --muted: #5e5a52;
+    --bg: #f4f0e7;
+    --card: #fffcf6;
+    --line: #d8d2c4;
+    --accent: #2a3d36;
+    --on: #2a3d36;
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 18px; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    line-height: 1.5;
+  }
+  main { max-width: 52rem; margin: 0 auto; padding: 1.75rem 1.25rem 3rem; }
+  h1 { font-size: 1.65rem; font-weight: 600; line-height: 1.25; margin: 0 0 1rem; }
+  nav { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0 0 1rem; }
+  nav button {
+    font: inherit;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 0.25rem 0.7rem;
+    cursor: pointer;
+    color: var(--fg);
+  }
+  nav button[aria-selected="true"] {
+    background: var(--on);
+    color: var(--card);
+    border-color: var(--on);
+  }
+  .panel { display: none; }
+  .panel.on { display: block; }
+  .lens { color: var(--muted); font-style: italic; margin: 0 0 0.8rem; }
+  .goal { margin: 1rem 0 0; }
+  .goal strong { font-weight: 650; }
+  ol, ul { margin: 0.6rem 0 0; padding: 0 0 0 1.3rem; }
+  li { margin: 0 0 0.35rem; }
+  .diagram {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 1.1rem 0.8rem;
+    overflow-x: auto;
+    min-height: 12rem;
+  }
+  .diagram .mermaid { margin: 0; background: transparent; }
+</style>
+</head>
+<body>
+<main>
+  <h1>{{title}}</h1>
+  <nav role="tablist">
+{{#panels}}
+    <button type="button" role="tab" data-tab="{{lens_id}}" aria-selected="{{#active}}true{{/active}}{{^active}}false{{/active}}">{{lens_name}}</button>
+{{/panels}}
+  </nav>
+{{#panels}}
+  <section class="panel{{#active}} on{{/active}}" data-panel="{{lens_id}}" role="tabpanel">
+    <p class="lens">For: {{lens_name}}</p>
+    <div class="diagram">
+      <pre class="mermaid">{{{mermaid}}}</pre>
+    </div>
+    <p class="goal"><strong>Goal.</strong> {{goal}}</p>
+{{#closing}}
+    <ul>
+{{#items}}
+      <li>{{.}}</li>
+{{/items}}
+    </ul>
+{{/closing}}
+{{#show_steps}}
+    <ol>
+{{#steps}}
+      <li>{{text}}</li>
+{{/steps}}
+    </ol>
+{{/show_steps}}
+  </section>
+{{/panels}}
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "strict", flowchart: { htmlLabels: true, curve: "basis" } });
+  document.querySelectorAll("nav [data-tab]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var id = btn.getAttribute("data-tab");
+      document.querySelectorAll("nav [data-tab]").forEach(function (b) {
+        b.setAttribute("aria-selected", b === btn ? "true" : "false");
+      });
+      document.querySelectorAll("[data-panel]").forEach(function (p) {
+        if (p.getAttribute("data-panel") === id) { p.classList.add("on"); }
+        else { p.classList.remove("on"); }
+      });
+    });
+  });
+</script>
+</body>
+</html>

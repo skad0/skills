@@ -1,0 +1,67 @@
+id: product
+name: Product
+# Own list — user-facing words only (no server, database, API).
+allowed_terms:
+  - user
+  - page
+  - screen
+  - action
+  - result
+  - account
+  - photo
+  - report
+  - map
+  - form
+  - location
+  - place
+  - city
+  - button
+  - list
+  - filter
+  - message
+  - error
+  - phone
+  - public
+  - private
+  - category
+  - time
+  - date
+  - link
+  - show
+  - hide
+  - send
+  - check
+  - status
+  - image
+  - flag
+  - staff
+  - point
+  - problem
+  - street
+  - original
+  - face
+  - plate
+  - open
+max_boxes: 6
+min_boxes: 3
+max_steps: 6
+max_level: 1
+collapse: true
+show_internals: false
+show_details: false
+show_steps: false
+show_glossary: false
+show_skipped: false
+direction: LR
+max_prose_words: 60
+max_arrow_words: 5
+max_words_per_step: 20
+max_sentence_words: 20
+max_closing_items: 3
+closing_section:
+  name: User impact
+  field: user_impact
+  contains: At most three short bullets on what the user sees or must do.
+tone: >
+  User journey in the picture: phone, report page, map. Dashed arrows
+  for other paths. Almost no prose under the diagram.

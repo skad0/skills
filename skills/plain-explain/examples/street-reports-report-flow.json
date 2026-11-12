@@ -1,0 +1,255 @@
+{
+  "_sources": [
+    "skad0/street-reports on GitHub, default branch main, read 2026-11-12 (read-only).",
+    "README.md: public-report rules, blur pipeline, how photos are stored, map loading, storage (object store vs local files).",
+    "app/intake.py: accept_report, store_report; classify may hold or mark graphic.",
+    "app/main.py: GET /report, POST /reports, GET /reports, GET /map.",
+    "Telegram is an optional intake into the same store path. The web-form place-range check is unverified."
+  ],
+  "title": "From a phone to the map",
+  "goal": "A user sends a photo of a street problem, and the report is shown on a public map.",
+  "boxes": [
+    {
+      "id": "phone",
+      "label": "Phone",
+      "level": 1,
+      "collapse_to": "client"
+    },
+    {
+      "id": "page",
+      "label": "Report page",
+      "level": 1,
+      "collapse_to": "client"
+    },
+    {
+      "id": "client",
+      "label": "Client",
+      "level": 2,
+      "aggregate": true
+    },
+    {
+      "id": "server",
+      "label": "Server",
+      "level": 3,
+      "collapse_to": "service",
+      "note": "one process"
+    },
+    {
+      "id": "service",
+      "label": "Service",
+      "level": 2,
+      "aggregate": true
+    },
+    {
+      "id": "photos",
+      "label": "Photo files",
+      "level": 3,
+      "collapse_to": "storage",
+      "group": "Storage"
+    },
+    {
+      "id": "database",
+      "label": "Database",
+      "level": 3,
+      "collapse_to": "storage",
+      "group": "Storage"
+    },
+    {
+      "id": "storage",
+      "label": "Storage",
+      "level": 2,
+      "aggregate": true
+    },
+    {
+      "id": "map",
+      "label": "Map page",
+      "level": 1
+    },
+    {
+      "id": "held",
+      "label": "Not public",
+      "level": 1
+    }
+  ],
+  "arrows": [
+    {
+      "id": "a_open",
+      "from": "phone",
+      "to": "page",
+      "label": "photo and place",
+      "step": 1,
+      "kind": "normal"
+    },
+    {
+      "id": "a_send",
+      "from": "page",
+      "to": "server",
+      "label": "new report",
+      "step": 2,
+      "kind": "normal"
+    },
+    {
+      "id": "a_original",
+      "from": "server",
+      "to": "photos",
+      "label": "original",
+      "step": 7,
+      "kind": "normal"
+    },
+    {
+      "id": "a_record",
+      "from": "server",
+      "to": "database",
+      "label": "record",
+      "step": 8,
+      "kind": "normal"
+    },
+    {
+      "id": "a_blur",
+      "from": "server",
+      "to": "photos",
+      "label": "safe photo",
+      "step": 9,
+      "kind": "normal"
+    },
+    {
+      "id": "a_ask",
+      "from": "map",
+      "to": "server",
+      "label": "request",
+      "step": 10,
+      "kind": "query"
+    },
+    {
+      "id": "a_return",
+      "from": "server",
+      "to": "map",
+      "label": "public reports",
+      "step": 11,
+      "kind": "normal"
+    },
+    {
+      "id": "a_held",
+      "from": "server",
+      "to": "held",
+      "label": "not public",
+      "kind": "failure"
+    },
+    {
+      "id": "a_telegram",
+      "from": "phone",
+      "to": "server",
+      "label": "via Telegram",
+      "kind": "optional"
+    }
+  ],
+  "steps": [
+    {
+      "n": 1,
+      "arrow": "a_open",
+      "level": 1,
+      "text": "The user puts a photo and a place on the report page."
+    },
+    {
+      "n": 2,
+      "arrow": "a_send",
+      "level": 1,
+      "text": "The user sends the report; after a check it can show on the map."
+    },
+    {
+      "n": 3,
+      "arrow": "a_send",
+      "level": 2,
+      "text": "The client sends a new report to the service."
+    },
+    {
+      "n": 4,
+      "arrow": "a_original",
+      "level": 2,
+      "text": "The service stores the photo and record, then a safe photo."
+    },
+    {
+      "n": 5,
+      "arrow": "a_ask",
+      "level": 2,
+      "text": "The map page asks the service for public reports."
+    },
+    {
+      "n": 13,
+      "arrow": "a_return",
+      "level": 2,
+      "text": "The service returns public reports to the map."
+    },
+    {
+      "n": 6,
+      "arrow": "a_open",
+      "level": 3,
+      "text": "The user sends a photo and a place from the report page."
+    },
+    {
+      "n": 7,
+      "arrow": "a_send",
+      "level": 3,
+      "text": "The report page sends a new report to the server."
+    },
+    {
+      "n": 8,
+      "arrow": "a_original",
+      "level": 3,
+      "text": "The server stores the original photo as a private file."
+    },
+    {
+      "n": 9,
+      "arrow": "a_record",
+      "level": 3,
+      "text": "The server writes a report record."
+    },
+    {
+      "n": 10,
+      "arrow": "a_blur",
+      "level": 3,
+      "text": "A worker blurs faces and plates and stores the safe photo."
+    },
+    {
+      "n": 11,
+      "arrow": "a_ask",
+      "level": 3,
+      "text": "The map page asks the server for public reports."
+    },
+    {
+      "n": 12,
+      "arrow": "a_return",
+      "level": 3,
+      "text": "The server returns public reports; the map shows them."
+    }
+  ],
+  "risks": [
+    "If blur does not work or the photo is graphic, the report is not public.",
+    "If there is no place, the server returns an error.",
+    "Many flags take a report off the map."
+  ],
+  "user_impact": [
+    "No account is needed.",
+    "Not shown at once: faces and plates are made hard to read first.",
+    "A photo not fit for public is not shown."
+  ],
+  "tradeoffs": [
+    "Public only after a safe photo: failure means never shown, and not at once.",
+    "Originals stay private; cost is two files and a worker.",
+    "Photo check is an outside service; form, photo work, and map share one place."
+  ],
+  "glossary": [
+    {
+      "term": "Telegram",
+      "definition": "A chat a user can send a photo and a place through."
+    },
+    {
+      "term": "blur",
+      "definition": "Make faces and plates in a photo hard to read."
+    },
+    {
+      "term": "graphic",
+      "definition": "A photo marked as not fit to show in public."
+    }
+  ]
+}

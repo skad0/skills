@@ -1,0 +1,37 @@
+id: engineer-new
+name: New engineer
+extends: base
+allowed_terms:
+  - worker
+  - storage
+  - original
+  - severity
+  - graphic
+  - blur
+  - plate
+  - face
+  - hold
+  - service
+max_boxes: 7
+min_boxes: 3
+max_steps: 10
+max_level: 3
+collapse: false
+show_internals: true
+show_details: false
+show_steps: true
+show_glossary: false
+show_skipped: false
+direction: TB
+max_prose_words: 150
+max_arrow_words: 5
+max_words_per_step: 22
+max_sentence_words: 22
+max_closing_items: 3
+closing_section:
+  name: What can go wrong
+  field: risks
+  contains: At most three short failure points, preferably already drawn as dashed arrows.
+tone: >
+  Diagram first. Numbered short arrow labels. Compact one-line steps.
+  Failure and optional paths are dashed arrows, not paragraphs.

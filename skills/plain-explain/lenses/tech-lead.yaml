@@ -1,0 +1,47 @@
+id: tech-lead
+name: Tech lead
+extends: base
+allowed_terms:
+  - service
+  - cost
+  - risk
+  - scale
+  - dependency
+  - storage
+  - load
+  - failure
+  - limit
+  - privacy
+  - tradeoff
+  - fallback
+  - worker
+  - original
+  - graphic
+  - blur
+  - plate
+  - face
+  - hold
+  - staff
+max_boxes: 5
+min_boxes: 3
+max_steps: 6
+max_level: 2
+collapse: true
+show_internals: true
+show_details: false
+show_steps: false
+show_glossary: false
+show_skipped: false
+direction: TB
+max_prose_words: 80
+max_arrow_words: 5
+max_words_per_step: 20
+max_sentence_words: 20
+max_closing_items: 3
+closing_section:
+  name: Tradeoffs and failure points
+  field: tradeoffs
+  contains: At most three short bullets on cost, scale, dependencies, and failure.
+tone: >
+  Big boxes (client, service, storage, map). Tradeoffs and failures
+  in the picture (dashed arrows) and in three short bullets. No step list.
