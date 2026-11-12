@@ -1,0 +1,188 @@
+{
+  "title": "From a phone to the map",
+  "goal": "A user sends a street photo and the map shows the report.",
+  "lens_id": "engineer-new",
+  "direction": "TB",
+  "boxes": [
+    {
+      "id": "phone",
+      "label": "User phone",
+      "note": "",
+      "shape": "box"
+    },
+    {
+      "id": "page",
+      "label": "Report page",
+      "note": "",
+      "shape": "box"
+    },
+    {
+      "id": "server",
+      "label": "Report server",
+      "note": "one process",
+      "shape": "box"
+    },
+    {
+      "id": "photos",
+      "label": "Photo files",
+      "note": "",
+      "shape": "box"
+    },
+    {
+      "id": "database",
+      "label": "Report records",
+      "note": "",
+      "shape": "box"
+    },
+    {
+      "id": "map",
+      "label": "Map page",
+      "note": "",
+      "shape": "box"
+    },
+    {
+      "id": "held",
+      "label": "Not shown on the map",
+      "note": "",
+      "shape": "box"
+    }
+  ],
+  "arrows": [
+    {
+      "id": "a_open",
+      "from": "phone",
+      "to": "page",
+      "actor": "user",
+      "action": "photo and place",
+      "kind": "normal",
+      "dashed": false
+    },
+    {
+      "id": "a_send",
+      "from": "page",
+      "to": "server",
+      "actor": "user",
+      "action": "new report",
+      "kind": "normal",
+      "dashed": false
+    },
+    {
+      "id": "a_original",
+      "from": "server",
+      "to": "photos",
+      "actor": "server",
+      "action": "original",
+      "kind": "normal",
+      "dashed": false
+    },
+    {
+      "id": "a_record",
+      "from": "server",
+      "to": "database",
+      "actor": "server",
+      "action": "record",
+      "kind": "normal",
+      "dashed": false
+    },
+    {
+      "id": "a_blur",
+      "from": "server",
+      "to": "photos",
+      "actor": "worker",
+      "action": "safe photo",
+      "kind": "normal",
+      "dashed": false
+    },
+    {
+      "id": "a_ask",
+      "from": "map",
+      "to": "server",
+      "actor": "map",
+      "action": "request",
+      "kind": "query",
+      "dashed": false
+    },
+    {
+      "id": "a_return",
+      "from": "server",
+      "to": "map",
+      "actor": "server",
+      "action": "public reports",
+      "kind": "normal",
+      "dashed": false
+    },
+    {
+      "id": "a_held",
+      "from": "server",
+      "to": "held",
+      "actor": "server",
+      "action": "Report held for review",
+      "kind": "failure",
+      "dashed": true
+    },
+    {
+      "id": "a_telegram",
+      "from": "phone",
+      "to": "server",
+      "actor": "user",
+      "action": "via Telegram",
+      "kind": "optional",
+      "dashed": true
+    }
+  ],
+  "steps": [
+    {
+      "n": 1,
+      "text": "The user sends a photo and a place.",
+      "arrow": "a_open"
+    },
+    {
+      "n": 2,
+      "text": "The page sends the report to the server.",
+      "arrow": "a_send"
+    },
+    {
+      "n": 3,
+      "text": "The server stores the original photo.",
+      "arrow": "a_original"
+    },
+    {
+      "n": 4,
+      "text": "The server writes a record.",
+      "arrow": "a_record"
+    },
+    {
+      "n": 5,
+      "text": "A worker blurs faces and plates.",
+      "arrow": "a_blur"
+    },
+    {
+      "n": 6,
+      "text": "The map asks for public reports.",
+      "arrow": "a_ask"
+    },
+    {
+      "n": 7,
+      "text": "The server returns the public reports.",
+      "arrow": "a_return"
+    }
+  ],
+  "closing": {
+    "name": "What can go wrong",
+    "items": [
+      "If blur does not work, the report is not public.",
+      "If there is no place, the server returns an error.",
+      "Many flags take a report off the map."
+    ]
+  },
+  "kept": [
+    "phone",
+    "page",
+    "server",
+    "photos",
+    "database",
+    "map",
+    "held"
+  ],
+  "collapsed": []
+}
