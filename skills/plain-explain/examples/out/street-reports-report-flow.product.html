@@ -73,15 +73,15 @@
   phone["User phone"]
   page["Report page"]
   map["Map page"]
-  held["Not public"]
+  held["Not shown on the map"]
   phone -->|"1. photo and place"| page
   phone -.->|"via Telegram"| map
   page -->|"2. new report"| map
-  page -.->|"not public"| held</pre>
+  page -.->|"Report held for review"| held</pre>
   </div>
   <table class="failures">
     <caption>Failure</caption>
-    <tr><td>Report page → Not public: not public</td></tr>
+    <tr><td>Report held for review → Not shown on the map</td></tr>
   </table>
   <p class="goal"><strong>Goal.</strong> A user sends a street photo and the map shows the report.</p>
   <table>

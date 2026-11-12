@@ -455,6 +455,13 @@ def load_common_words(path: Path | None = None) -> set[str]:
     return {w.lower() for w in _lines_file(path)}
 
 
+def load_tech_words(path: Path | None = None) -> set[str]:
+    path = path or (ROOT / "tech-words.txt")
+    if not path.exists():
+        return set()
+    return {w.lower() for w in _lines_file(path)}
+
+
 def load_base_terms(path: Path | None = None) -> list[str]:
     path = path or (ROOT / "lenses" / "base-terms.txt")
     return _lines_file(path)
@@ -1601,7 +1608,7 @@ def _lexicon_for(view: dict, lens: dict, common: set[str]) -> tuple[set[str], li
         t = (g.get("term") or "").strip()
         if t and t not in terms:
             terms.append(t)
-    lexicon = {t.lower() for t in terms} | {w.lower() for w in common}
+    lexicon = {t.lower() for t in terms} | {w.lower() for w in common} | load_tech_words()
     phrases = sorted((t.lower() for t in terms if " " in t.lower()), key=len, reverse=True)
     return lexicon, phrases
 
@@ -1858,6 +1865,22 @@ def _rendered_closing(view: dict):
     return False
 
 
+def _phrase_key(text: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", (text or "").lower()))
+
+
+def _arrow_caption(arrow: dict, src_label: str = "", dst_label: str = "") -> str:
+    """Actor and action, dropping an action that only repeats the actor or a box."""
+    actor = (arrow.get("actor") or "").strip()
+    action = _shown_action(arrow).replace("|", "/")
+    repeated = {_phrase_key(actor), _phrase_key(src_label), _phrase_key(dst_label)}
+    if _phrase_key(action) in repeated:
+        action = ""
+    if actor and action:
+        return f"{actor}: {action}"
+    return actor or action
+
+
 def _failure_rows(view: dict) -> list[str]:
     labels = {b["id"]: (b.get("label") or b["id"]) for b in view["boxes"]}
     rows = []
@@ -1867,7 +1890,10 @@ def _failure_rows(view: dict) -> list[str]:
         src = labels.get(a["from"], a["from"])
         dst = labels.get(a["to"], a["to"])
         action = _shown_action(a).replace("|", "/")
-        rows.append(f"{src} → {dst}: {action}")
+        if not action or _phrase_key(action) in (_phrase_key(src), _phrase_key(dst)):
+            rows.append(f"{src} → {dst}")
+        else:
+            rows.append(f"{action} → {dst}")
     return rows
 
 
@@ -2001,6 +2027,202 @@ def _svg_box_size(label: str, note: str) -> tuple[int, int]:
     return max(136, min(220, width)), (58 if note else 44)
 
 
+def _rects_overlap(a, b) -> bool:
+    ax, ay, aw, ah = a
+    bx, by, bw, bh = b
+    return min(ax + aw, bx + bw) - max(ax, bx) > 0.5 and min(ay + ah, by + bh) - max(ay, by) > 0.5
+
+
+def _seg_hits_rect(x1: float, y1: float, x2: float, y2: float, rect) -> bool:
+    rx, ry, rw, rh = rect
+
+    def inside(px, py) -> bool:
+        return rx < px < rx + rw and ry < py < ry + rh
+
+    if inside(x1, y1) or inside(x2, y2):
+        return True
+
+    def crosses(ax, ay, bx, by, cx, cy, dx, dy) -> bool:
+        def orient(px, py, qx, qy, rx_, ry_):
+            return (qy - py) * (rx_ - qx) - (qx - px) * (ry_ - qy)
+
+        left = orient(ax, ay, bx, by, cx, cy)
+        right = orient(ax, ay, bx, by, dx, dy)
+        left2 = orient(cx, cy, dx, dy, ax, ay)
+        right2 = orient(cx, cy, dx, dy, bx, by)
+        return left * right < 0 and left2 * right2 < 0
+
+    corners = ((rx, ry), (rx + rw, ry), (rx + rw, ry + rh), (rx, ry + rh))
+    for i in range(4):
+        ax, ay = corners[i]
+        bx, by = corners[(i + 1) % 4]
+        if crosses(x1, y1, x2, y2, ax, ay, bx, by):
+            return True
+    return False
+
+
+def _curve_segments(x1, y1, cx, cy, x2, y2, steps: int = 8):
+    pts = []
+    for i in range(steps + 1):
+        t = i / steps
+        u = 1 - t
+        pts.append((u * u * x1 + 2 * u * t * cx + t * t * x2, u * u * y1 + 2 * u * t * cy + t * t * y2))
+    return list(zip(pts, pts[1:]))
+
+
+def _label_rect(lx: float, ly: float, tw: int):
+    return (lx - tw / 2, ly - 12, tw, 16)
+
+
+def _route_svg(boxes, arrows, pos, depth, direction, by_id):
+    """Straight edges in target order. A back-edge runs beside its forward twin."""
+
+    def port(rect, side, slot, slots):
+        x, y, w, h = rect
+        t = (slot + 1) / (slots + 1)
+        if side == "bottom":
+            return int(x + w * t), y + h
+        if side == "top":
+            return int(x + w * t), y
+        if side == "right":
+            return x + w, int(y + h * t)
+        return x, int(y + h * t)
+
+    def spread(i):
+        x, y, w, h = pos[i]
+        return (x + w / 2) if direction == "TB" else (y + h / 2)
+
+    out_order = {}
+    in_order = {}
+    for a in arrows:
+        if depth.get(a["to"], 0) - depth.get(a["from"], 0) == 1:
+            out_order.setdefault(a["from"], []).append(a)
+            in_order.setdefault(a["to"], []).append(a)
+    for lst in out_order.values():
+        lst.sort(key=lambda a: (spread(a["to"]), a["id"]))
+    for lst in in_order.values():
+        lst.sort(key=lambda a: (spread(a["from"]), a["id"]))
+    out_index = {a["id"]: (i, len(lst)) for lst in out_order.values() for i, a in enumerate(lst)}
+    in_index = {a["id"]: (i, len(lst)) for lst in in_order.values() for i, a in enumerate(lst)}
+    forward_pair = {}
+    for a in arrows:
+        if depth.get(a["to"], 0) - depth.get(a["from"], 0) == 1:
+            forward_pair.setdefault((a["from"], a["to"]), a["id"])
+
+    routes = []
+    for a in arrows:
+        frm, to = a["from"], a["to"]
+        df = depth.get(to, 0) - depth.get(frm, 0)
+        bend = None
+        if df == 1 and a["id"] in out_index:
+            oi, on = out_index[a["id"]]
+            ii, inn = in_index[a["id"]]
+            if direction == "TB":
+                x1, y1 = port(pos[frm], "bottom", oi, on)
+                x2, y2 = port(pos[to], "top", ii, inn)
+            else:
+                x1, y1 = port(pos[frm], "right", oi, on)
+                x2, y2 = port(pos[to], "left", ii, inn)
+        elif df == -1 and forward_pair.get((to, frm)) in out_index:
+            tid = forward_pair[(to, frm)]
+            oi, on = out_index[tid]
+            ii, inn = in_index[tid]
+            if direction == "TB":
+                ux, uy = port(pos[to], "bottom", oi, on)
+                lx, ly = port(pos[frm], "top", ii, inn)
+                x1, y1, x2, y2 = lx + 14, ly, ux + 14, uy
+            else:
+                ux, uy = port(pos[to], "right", oi, on)
+                lx, ly = port(pos[frm], "left", ii, inn)
+                x1, y1, x2, y2 = lx, ly + 14, ux, uy + 14
+        elif df > 1 or df < 0:
+            if direction == "TB":
+                x1, y1 = port(pos[frm], "left", 0, 1)
+                x2, y2 = port(pos[to], "left", 0, 1)
+                bend = (min(x1, x2) - 120, (y1 + y2) // 2)
+            else:
+                x1, y1 = port(pos[frm], "top", 0, 1)
+                x2, y2 = port(pos[to], "top", 0, 1)
+                bend = ((x1 + x2) // 2, min(y1, y2) - 120)
+        else:
+            if direction == "TB":
+                side_out, side_in = ("right", "left") if spread(to) >= spread(frm) else ("left", "right")
+            else:
+                side_out, side_in = ("bottom", "top") if spread(to) >= spread(frm) else ("top", "bottom")
+            x1, y1 = port(pos[frm], side_out, 0, 1)
+            x2, y2 = port(pos[to], side_in, 0, 1)
+        segments = _curve_segments(x1, y1, bend[0], bend[1], x2, y2) if bend else [((x1, y1), (x2, y2))]
+        text = _arrow_caption(a, by_id[frm].get("label") or "", by_id[to].get("label") or "")
+        routes.append(
+            {
+                "id": a["id"],
+                "kind": _kind(a),
+                "dashed": _is_dashed(a),
+                "to": to,
+                "x1": x1,
+                "y1": y1,
+                "x2": x2,
+                "y2": y2,
+                "bend": bend,
+                "segments": segments,
+                "text": text,
+                "df": df,
+            }
+        )
+
+    segments = [seg for route in routes for seg in route["segments"]]
+    obstacles = []
+    for b in boxes:
+        x, y, w, h = pos[b["id"]]
+        obstacles.append((x - 6, y - 6, w + 12, h + 12))
+    placed = []
+    for route in sorted(routes, key=lambda r: (-len(r["text"]), r["id"])):
+        text = route["text"]
+        if not text:
+            route["label"] = None
+            continue
+        tw = int(len(text) * 6.5) + 10
+        x1, y1, x2, y2 = route["x1"], route["y1"], route["x2"], route["y2"]
+        dx, dy = x2 - x1, y2 - y1
+        length = (dx * dx + dy * dy) ** 0.5 or 1.0
+        px, py = -dy / length, dx / length
+        candidates = []
+        if route["df"] == 1:
+            tx, ty, bw, bh = pos[route["to"]]
+            if direction == "TB":
+                candidates.append((x2 - 12 - tw / 2, ty - 8))
+                candidates.append((x2 + 12 + tw / 2, ty - 8))
+                candidates.append((tx + bw / 2, ty - 26))
+            else:
+                candidates.append((tx + bw / 2, ty - 8))
+                candidates.append((tx + bw / 2, ty + bh + 20))
+        for t in (0.7, 0.35, 0.85, 0.2, 0.55):
+            mx = x1 + dx * t
+            my = y1 + dy * t
+            for dist in (28, 48, 68, 92, 120):
+                for sign in (1, -1):
+                    candidates.append((mx + px * sign * dist, my + py * sign * dist))
+        candidates.append((min(x1, x2) - tw / 2 - 28, (y1 + y2) / 2))
+        candidates.append((max(x1, x2) + tw / 2 + 28, (y1 + y2) / 2))
+        chosen = None
+        for lx, ly in candidates:
+            rect = _label_rect(lx, ly, tw)
+            if any(_rects_overlap(rect, box) for box in obstacles):
+                continue
+            if any(_rects_overlap(rect, prev) for prev in placed):
+                continue
+            if any(_seg_hits_rect(a1, b1, a2, b2, rect) for (a1, b1), (a2, b2) in segments):
+                continue
+            chosen = (lx, ly, rect)
+            break
+        if chosen is None:
+            lx, ly = candidates[0]
+            chosen = (lx, ly, _label_rect(lx, ly, tw))
+        placed.append(chosen[2])
+        route["label"] = (chosen[0], chosen[1], tw, html.escape(text))
+    return routes
+
+
 def svg_document(view: dict) -> str:
     """Standalone flowchart. Integer grid, stdlib only, failure arrows last and darker."""
     boxes = [b for b in view.get("boxes") or [] if b.get("id")]
@@ -2017,8 +2239,8 @@ def svg_document(view: dict) -> str:
         b["id"]: _svg_box_size(b.get("label") or b["id"], (b.get("note") or "").strip())
         for b in boxes
     }
-    gap_x, gap_y = 36, 92
-    pos: dict[str, tuple[int, int, int, int]] = {}
+    gap_x, gap_y = 64, 128
+    pos = {}
     if direction == "LR":
         x = 0
         for layer in layers:
@@ -2028,7 +2250,7 @@ def svg_document(view: dict) -> str:
                 w, h = sizes[i]
                 pos[i] = (x + (col_w - w) // 2, y, w, h)
                 y += h + gap_y
-            x += col_w + gap_x + 48
+            x += col_w + gap_x + 36
     else:
         row_w = []
         for layer in layers:
@@ -2037,123 +2259,31 @@ def svg_document(view: dict) -> str:
         y = 0
         for layer, rw in zip(layers, row_w):
             x = (widest - rw) // 2
-            row_h = max(sizes[i][1] for i in layer)
+            row_h = max((sizes[i][1] for i in layer), default=0)
             for i in layer:
                 w, h = sizes[i]
                 pos[i] = (x, y + (row_h - h) // 2, w, h)
                 x += w + gap_x
             y += row_h + gap_y
-
-    def port(rect, side, slot, slots):
-        x, y, w, h = rect
-        t = (slot + 1) / (slots + 1)
-        if side == "bottom":
-            return int(x + w * t), y + h
-        if side == "top":
-            return int(x + w * t), y
-        if side == "right":
-            return x + w, int(y + h * t)
-        return x, int(y + h * t)
-
-    pair_slots: dict[tuple, list] = {}
-    target_slots: dict[str, list] = {}
-    for a in arrows:
-        pair_slots.setdefault((a["from"], a["to"]), []).append(a["id"])
-        if depth.get(a["to"], 0) > depth.get(a["from"], 0):
-            target_slots.setdefault(a["to"], []).append(a["id"])
-
-    def geometry(a, slot, slots):
-        frm, to = a["from"], a["to"]
-        df = depth.get(to, 0) - depth.get(frm, 0)
-        back = df < 0
-        skip = df > 1
-        same = df == 0
-        shift = 0
-        if direction == "LR":
-            if df > 0 or same:
-                sides = ("right", "left")
-            else:
-                sides = ("left", "right")
-            bend = back or skip or same
-        elif skip:
-            sides = ("left", "left")
-            bend = True
-        elif same:
-            sides = ("right", "left") if pos[to][0] >= pos[frm][0] else ("left", "right")
-            bend = True
-        elif back:
-            sides = ("top", "bottom")
-            bend = False
-            shift = 22
-        else:
-            sides = ("bottom", "top")
-            bend = False
-        x1, y1 = port(pos[frm], sides[0], slot, slots)
-        x2, y2 = port(pos[to], sides[1], slot, slots)
-        x1 += shift
-        x2 += shift
-        if bend:
-            offset = 96
-            if sides[0] == "left":
-                cx, cy = min(x1, x2) - offset, (y1 + y2) // 2
-            elif sides[0] == "right" and back:
-                cx, cy = max(x1, x2) + offset, (y1 + y2) // 2
-            elif sides[0] in ("top", "bottom") and direction == "LR":
-                cx, cy = (x1 + x2) // 2, min(y1, y2) - offset
-            else:
-                cx, cy = max(x1, x2) + offset, (y1 + y2) // 2
-            lx, ly = cx, cy
-        elif back:
-            cx = cy = None
-            lx = int(x1 * 0.22 + x2 * 0.78) - 58
-            ly = int(y1 * 0.22 + y2 * 0.78)
-        else:
-            cx = cy = None
-            mates_in = target_slots.get(to) or [a["id"]]
-            nslot = mates_in.index(a["id"]) if a["id"] in mates_in else 0
-            lx = pos[to][0] + pos[to][2] // 2
-            ly = pos[to][1] - 24 - nslot * 18
-        return x1, y1, x2, y2, bend, cx, cy, lx, ly
-
-    drawn = []
+    routes = _route_svg(boxes, arrows, pos, depth, direction, by_id)
     xs = [0]
     ys = [0]
     for b in boxes:
         x, y, w, h = pos[b["id"]]
         xs.extend((x, x + w))
         ys.extend((y, y + h))
-    rank = {"normal": 0, "branch": 0, "query": 1, "optional": 2, "failure": 3}
-    for a in sorted(arrows, key=lambda a: (rank.get(_kind(a), 1), a.get("id") or "")):
-        mates = pair_slots.get((a["from"], a["to"]), [a["id"]])
-        slot = mates.index(a["id"]) if a["id"] in mates else 0
-        x1, y1, x2, y2, bend, cx, cy, lx, ly = geometry(a, slot, len(mates))
-        kind = _kind(a)
-        if kind == "failure":
-            color = "#9a3412"
-        elif _is_dashed(a) or kind == "optional":
-            color = "#57534e"
-        else:
-            color = "#1c1b18"
-        xs.extend((x1, x2, lx))
-        ys.extend((y1, y2, ly))
-        if bend and cx is not None:
-            xs.append(cx)
-            ys.append(cy)
-        action = _shown_action(a)
-        if action:
-            tw = int(len(action) * 6.5) + 10
-            drawn.append(
-                (
-                    lx,
-                    ly,
-                    tw,
-                    color,
-                    html.escape(action),
-                    "700" if kind == "failure" else "400",
-                )
-            )
-            xs.extend((lx - tw // 2, lx + tw // 2))
+    for route in routes:
+        xs.extend((route["x1"], route["x2"]))
+        ys.extend((route["y1"], route["y2"]))
+        if route["bend"]:
+            xs.append(route["bend"][0])
+            ys.append(route["bend"][1])
+        label = route["label"]
+        if label:
+            lx, ly, tw, _text = label
+            xs.extend((lx - tw / 2, lx + tw / 2))
             ys.extend((ly - 14, ly + 4))
+    rank = {"normal": 0, "branch": 0, "query": 1, "optional": 2, "failure": 3}
 
     failures = _failure_rows(view)
     min_x = min(xs)
@@ -2225,19 +2355,17 @@ def svg_document(view: dict) -> str:
             body.append(
                 f'<text x="{x + w // 2}" y="{y + h // 2 + 5}" text-anchor="middle" font-size="14" fill="#1c1b18">{label}</text>'
             )
-    for a in sorted(arrows, key=lambda a: (rank.get(_kind(a), 1), a.get("id") or "")):
-        mates = pair_slots.get((a["from"], a["to"]), [a["id"]])
-        slot = mates.index(a["id"]) if a["id"] in mates else 0
-        x1, y1, x2, y2, bend, cx, cy, _lx, _ly = geometry(a, slot, len(mates))
-        x1, y1, x2, y2 = sx(x1), sy(y1), sx(x2), sy(y2)
-        kind = _kind(a)
+    for route in sorted(routes, key=lambda r: (rank.get(r["kind"], 1), r["id"])):
+        x1, y1, x2, y2 = sx(route["x1"]), sy(route["y1"]), sx(route["x2"]), sy(route["y2"])
+        kind = route["kind"]
         if kind == "failure":
             color, stroke_w, dash, mid = "#9a3412", "3", "7 4", "fail"
-        elif _is_dashed(a) or kind == "optional":
+        elif route["dashed"] or kind == "optional":
             color, stroke_w, dash, mid = "#57534e", "1.8", "5 4", "opt"
         else:
             color, stroke_w, dash, mid = "#1c1b18", "1.6", None, "norm"
-        if bend and cx is not None:
+        if route["bend"]:
+            cx, cy = route["bend"]
             path = f"M {x1} {y1} Q {sx(cx)} {sy(cy)} {x2} {y2}"
         else:
             path = f"M {x1} {y1} L {x2} {y2}"
@@ -2245,13 +2373,19 @@ def svg_document(view: dict) -> str:
         body.append(
             f'<path d="{path}" fill="none" stroke="{color}" stroke-width="{stroke_w}"{dash_attr} marker-end="url(#ah-{mid})"/>'
         )
-    for lx, ly, tw, color, text, weight in drawn:
+    for route in routes:
+        label = route["label"]
+        if not label:
+            continue
+        lx, ly, tw, text_esc = label
         lx, ly = sx(lx), sy(ly)
+        weight = "700" if route["kind"] == "failure" else "400"
+        color = "#9a3412" if route["kind"] == "failure" else ("#57534e" if route["dashed"] else "#1c1b18")
         body.append(
             f'<rect x="{lx - tw // 2}" y="{ly - 12}" width="{tw}" height="16" rx="3" fill="#f4f0e7"/>'
         )
         body.append(
-            f'<text x="{lx}" y="{ly}" text-anchor="middle" font-size="12" font-weight="{weight}" fill="{color}">{text}</text>'
+            f'<text x="{lx}" y="{ly}" text-anchor="middle" font-size="12" font-weight="{weight}" fill="{color}">{text_esc}</text>'
         )
     if failures:
         fy = height - cap_h + 8

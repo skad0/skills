@@ -9,7 +9,7 @@ description: >-
 
 Use this when a technical path must land in a doc as one short picture: real actors, every hop, and words that audience already uses. One lens, one diagram, and a table. Three-lens tabs are opt-in.
 
-Helpers sit next to this skill. Run commands from this folder (paths below are relative to it): `explain.py`, `model.schema.json`, `MODEL.md`, `lenses/`, `templates/`, `common-words.txt`, `synonyms.txt`, and `examples/`.
+Helpers sit next to this skill. Run commands from this folder (paths below are relative to it): `explain.py`, `model.schema.json`, `MODEL.md`, `lenses/`, `templates/`, `common-words.txt`, `tech-words.txt`, `synonyms.txt`, and `examples/`.
 
 ## When to use
 
@@ -33,7 +33,7 @@ Prose budgets, outside the diagram: product <=45 words, tech-lead <=50, engineer
 
 Read the real system. Do not invent parts. Start from `python3 explain.py scaffold -o model.json`, or copy `examples/street-reports-report-flow.json`. The schema is `model.schema.json`; the guide is `MODEL.md`.
 
-Write the finest graph. Name real actors on the boxes. Put `actor` and `action` on every arrow. Give coarser boxes a `level` (1 = everyone, 2 = tech-lead, 3 = engineer), `collapse_to` on fine boxes, and `aggregate: true` on the parents. Set `audience` to the lens you will render. Put team words in `audiences` (`{"engineer-new": ["DM", "Thunderbolt"]}`) so they pass with no glossary line.
+Write the finest graph. Name real actors on the boxes. Put `actor` and `action` on every arrow. Give coarser boxes a `level` (1 = everyone, 2 = tech-lead, 3 = engineer), `collapse_to` on fine boxes, and `aggregate: true` on the parents. Set `audience` to the lens you will render. `tech-words.txt` (server, cache, API, and the like) is always allowed. Optional `audiences` adds words for one audience, for example `{"engineer-new": ["webhook"]}`.
 
 The `goal` is one sentence in words every lens allows. Closing rows go in `risks`, `user_impact`, and `tradeoffs` (<=3, one sentence each). Keys starting with `_` are author notes.
 

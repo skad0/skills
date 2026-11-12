@@ -7,16 +7,16 @@ flowchart LR
   phone["User phone"]
   page["Report page"]
   map["Map page"]
-  held["Not public"]
+  held["Not shown on the map"]
   phone -->|"1. photo and place"| page
   phone -.->|"via Telegram"| map
   page -->|"2. new report"| map
-  page -.->|"not public"| held
+  page -.->|"Report held for review"| held
 ```
 
 | Failure |
 | --- |
-| Report page → Not public: not public |
+| Report held for review → Not shown on the map |
 
 **Goal.** A user sends a street photo and the map shows the report.
 

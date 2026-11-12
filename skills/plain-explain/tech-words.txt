@@ -1,0 +1,20 @@
+# General tech words allowed for every audience. Not team names.
+# Case is ignored. Obscure jargon and undefined acronyms stay flagged.
+server
+cache
+API
+request
+response
+database
+browser
+page
+URL
+HTML
+queue
+log
+login
+client
+JSON
+token
+file
+error

@@ -12,7 +12,7 @@ flowchart TB
     database["Report records"]
   end
   map["Map page"]
-  held["Not public"]
+  held["Not shown on the map"]
   phone -->|"1. photo and place"| page
   page -->|"2. new report"| server
   server -->|"3. original"| photos
@@ -20,13 +20,13 @@ flowchart TB
   server -->|"5. safe photo"| photos
   map -->|"6. request"| server
   server -->|"7. public reports"| map
-  server -.->|"not public"| held
+  server -.->|"Report held for review"| held
   phone -.->|"via Telegram"| server
 ```
 
 | Failure |
 | --- |
-| Report server → Not public: not public |
+| Report held for review → Not shown on the map |
 
 **Goal.** A user sends a street photo and the map shows the report.
 

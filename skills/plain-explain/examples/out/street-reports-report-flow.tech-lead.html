@@ -74,17 +74,17 @@
   service["Report server"]
   storage["Photo files"]
   map["Map page"]
-  held["Not public"]
+  held["Not shown on the map"]
   client -->|"1. new report"| service
   service -->|"2. original, record, safe photo"| storage
   map -->|"3. request"| service
   service -->|"4. public reports"| map
-  service -.->|"not public"| held
+  service -.->|"Report held for review"| held
   client -.->|"via Telegram"| service</pre>
   </div>
   <table class="failures">
     <caption>Failure</caption>
-    <tr><td>Report server → Not public: not public</td></tr>
+    <tr><td>Report held for review → Not shown on the map</td></tr>
   </table>
   <p class="goal"><strong>Goal.</strong> A user sends a street photo and the map shows the report.</p>
   <table>

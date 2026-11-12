@@ -11,7 +11,7 @@ The schema is `model.schema.json`. Keys that start with `_` are author notes: no
 | `title` | yes | Heading. Keep it short. |
 | `goal` | yes | One sentence under every lens, in words every lens allows. |
 | `audience` | no | Default lens id when `render` has no `--lens`. |
-| `audiences` | no | Map of audience or lens id to allowed terms (`DM`, `Thunderbolt`). No glossary line. `--audience` adds a key; the lens id and `all` always apply. |
+| `audiences` | no | Optional extra words for one audience, for example `{"engineer-new": ["webhook"]}`. |
 | `boxes` | yes | Concrete actors or things. `id`, `label`. Optional: `level` (1–3, default 1), `collapse_to`, `aggregate`, `group`, `note`, `shape`. |
 | `arrows` | yes | `id`, `from`, `to`, `actor`, `action` (what they do, ≤5 words; `label` may repeat it), optional `step`, `kind` (`normal`, `optional`, `failure`, `query`, `branch`). `optional` and `failure` are dashed. Failure is also the table under the picture. |
 | `steps` | no | Contiguous `n` from 1. `text` is one sentence. `arrow`, `level`. A lens keeps steps whose level equals `max_level`, then renumbers them onto actions. |
@@ -42,6 +42,6 @@ Templates are a Mustache subset: `{{name}}` escaped for HTML, `{{{mermaid}}}` ra
 
 `python3 explain.py check model.json --lens product` runs schema, lens apply, gaps, limits, vocabulary, then actor warnings.
 
-Vocabulary allows lens terms, `audiences` for this lens (and `--audience`), glossary terms, and `common-words.txt`, plus simple English forms. Actor warnings (a label ending in `step`, or the words `service`, `renderer`, `data`, or a missing actor or action) do not fail the run.
+Vocabulary allows lens terms, `tech-words.txt`, `audiences` for this lens (and `--audience`), glossary terms, and `common-words.txt`, plus simple English forms. Obscure jargon and undefined acronyms still fail. Actor warnings (a label ending in `step`, or the words `service`, `renderer`, `data`, or a missing actor or action) do not fail the run.
 
 Limits: box and step caps, five-word actions, one sentence per shown step, at most three closing rows, prose ≤ `max_prose_words`. Hitting the word cap with two sentences in a step still fails. Exit code is non-zero only for errors. `render` refuses to write unless `--force`.

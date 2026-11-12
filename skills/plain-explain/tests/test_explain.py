@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -249,7 +250,7 @@ class AudienceTerms(unittest.TestCase):
     def _picture(self, **extra):
         m = _model(
             title="A photo",
-            goal="A user sends a photo to Thunderbolt as an experiment.",
+            goal="A user sends a photo with frobnicate ZXQ.",
             legend="",
             boxes=[
                 {"id": "a", "label": "Phone", "level": 1},
@@ -289,25 +290,33 @@ class AudienceTerms(unittest.TestCase):
         bare = self._picture()
         product = [i for i in _errors(bare, "product") if i.kind == "vocabulary"]
         blob = "\n".join(i.message for i in product)
-        self.assertIn("Thunderbolt", blob)
-        self.assertIn("experiment", blob)
+        self.assertIn("frobnicate", blob)
+        self.assertIn("ZXQ", blob)
 
-        allowed = self._picture(
-            audiences={"product": ["Thunderbolt", "experiment", "DM", "slot"]}
-        )
+        allowed = self._picture(audiences={"product": ["frobnicate", "ZXQ"]})
         product_ok = [i for i in _errors(allowed, "product") if i.kind == "vocabulary"]
         ok_blob = "\n".join(i.message for i in product_ok)
-        self.assertNotIn("Thunderbolt", ok_blob, ok_blob)
-        self.assertNotIn("experiment", ok_blob, ok_blob)
+        self.assertNotIn("frobnicate", ok_blob, ok_blob)
+        self.assertNotIn("ZXQ", ok_blob, ok_blob)
         self.assertEqual(allowed.get("glossary"), [])
 
         other = [i for i in _errors(allowed, "engineer-new") if i.kind == "vocabulary"]
-        self.assertTrue(any("Thunderbolt" in i.message for i in other), [str(i) for i in other])
+        self.assertTrue(any("frobnicate" in i.message for i in other), [str(i) for i in other])
+
+    def test_default_tech_words_need_no_glossary(self):
+        model = self._picture(goal="A browser sends a cache API request through a queue.")
+        blob = "\n".join(i.message for i in _errors(model, "product") if i.kind == "vocabulary")
+        for word in ("browser", "cache", "API", "queue", "request"):
+            self.assertNotIn(repr(word), blob, blob)
+        self.assertEqual(model.get("glossary"), [])
+        listed = (ROOT / "tech-words.txt").read_text(encoding="utf-8").lower()
+        for banned in ("thunderbolt", "experiment", "\ndm\n", "\nslot\n"):
+            self.assertNotIn(banned, "\n" + listed + "\n")
 
     def test_cli_audience_flag(self):
         model = self._picture(
-            goal="A user sends a photo with DM and slot.",
-            audiences={"internal": ["DM", "slot"]},
+            goal="A user sends a photo with frobnicate.",
+            audiences={"internal": ["frobnicate"]},
         )
         with tempfile.TemporaryDirectory() as d:
             path = _write_model(Path(d), model)
@@ -315,8 +324,7 @@ class AudienceTerms(unittest.TestCase):
                 ["check", str(path), "--lens", "product", "--audience", "internal"]
             )
         self.assertEqual(rc, 0, out)
-        self.assertNotIn("DM", out)
-        self.assertNotIn("'slot'", out)
+        self.assertNotIn("frobnicate", out)
 
 
 class OneOutput(unittest.TestCase):
@@ -332,7 +340,8 @@ class OneOutput(unittest.TestCase):
             self.assertNotIn("For: Tech lead", text)
             self.assertLess(text.index("| Failure |"), text.index("**Goal.**"))
             self.assertIn("| What can go wrong |", text)
-            self.assertIn("not public", text.lower())
+            self.assertIn("Report held for review → Not shown on the map", text)
+            self.assertNotIn("not public: not public", text.lower())
             self.assertNotIn("tablist", text)
             self.assertIn("kept:", err)
             self.assertIn("collapsed:", err)
@@ -516,7 +525,10 @@ class ReusableExport(unittest.TestCase):
             self.assertNotIn("mermaid", text.lower())
             self.assertNotIn("<script", text.lower())
             self.assertIn("stroke-dasharray", text)
-            self.assertIn("not public", text.lower())
+            self.assertIn("user: photo and place", text)
+            self.assertIn("server: Report held for review", text)
+            self.assertIn("Report held for review → Not shown on the map", text)
+            self.assertNotIn("not public: not public", text.lower())
             width = float(root.get("width"))
             height = float(root.get("height"))
             self.assertGreater(width, 200)
@@ -557,6 +569,127 @@ class ReusableExport(unittest.TestCase):
                 self.assertIn("kind", arrow)
             kinds = {a["kind"] for a in data["arrows"]}
             self.assertIn("failure", kinds)
+
+
+def _svg_segments(d: str):
+    nums = [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", d)]
+    if "Q" in d:
+        x1, y1, cx, cy, x2, y2 = nums[:6]
+        pts = []
+        steps = 8
+        for i in range(steps + 1):
+            t = i / steps
+            u = 1 - t
+            pts.append(
+                (
+                    u * u * x1 + 2 * u * t * cx + t * t * x2,
+                    u * u * y1 + 2 * u * t * cy + t * t * y2,
+                )
+            )
+        return list(zip(pts, pts[1:]))
+    return [((nums[0], nums[1]), (nums[2], nums[3]))]
+
+
+def _rects_overlap(a, b) -> bool:
+    ax, ay, aw, ah = a
+    bx, by, bw, bh = b
+    return min(ax + aw, bx + bw) - max(ax, bx) > 0.5 and min(ay + ah, by + bh) - max(ay, by) > 0.5
+
+
+def _seg_hits_rect(x1, y1, x2, y2, rect) -> bool:
+    rx, ry, rw, rh = rect
+
+    def inside(px, py):
+        return rx < px < rx + rw and ry < py < ry + rh
+
+    if inside(x1, y1) or inside(x2, y2):
+        return True
+
+    def crosses(ax, ay, bx, by, cx, cy, dx, dy):
+        def orient(px, py, qx, qy, sx, sy):
+            return (qy - py) * (sx - qx) - (qx - px) * (sy - qy)
+
+        return (
+            orient(ax, ay, bx, by, cx, cy) * orient(ax, ay, bx, by, dx, dy) < 0
+            and orient(cx, cy, dx, dy, ax, ay) * orient(cx, cy, dx, dy, bx, by) < 0
+        )
+
+    corners = ((rx, ry), (rx + rw, ry), (rx + rw, ry + rh), (rx, ry + rh))
+    for i in range(4):
+        ax, ay = corners[i]
+        bx, by = corners[(i + 1) % 4]
+        if crosses(x1, y1, x2, y2, ax, ay, bx, by):
+            return True
+    return False
+
+
+class SvgLayout(unittest.TestCase):
+    def test_labels_do_not_cover_lines_or_each_other(self):
+        model = pe.load_model(EXAMPLE)
+        svg = pe.render(model, pe.load_lens("engineer-new"), "svg")
+        root = ET.fromstring(svg)
+        ns = "{http://www.w3.org/2000/svg}"
+        labels = []
+        for el in root.iter(ns + "rect"):
+            if el.get("fill") == "#f4f0e7" and el.get("height") == "16":
+                labels.append(
+                    (float(el.get("x")), float(el.get("y")), float(el.get("width")), float(el.get("height")))
+                )
+        self.assertGreaterEqual(len(labels), 4)
+        for i, a in enumerate(labels):
+            for b in labels[i + 1 :]:
+                self.assertFalse(_rects_overlap(a, b), (a, b))
+        segments = []
+        for el in root.iter(ns + "path"):
+            if not el.get("stroke"):
+                continue
+            segments.extend(_svg_segments(el.get("d")))
+        for rect in labels:
+            for (x1, y1), (x2, y2) in segments:
+                self.assertFalse(_seg_hits_rect(x1, y1, x2, y2, rect), rect)
+
+
+class FailureLine(unittest.TestCase):
+    def test_action_that_repeats_the_box_is_shown_once(self):
+        model = _model(
+            title="A photo",
+            goal="A user sends a photo.",
+            legend="",
+            boxes=[
+                {"id": "phone", "label": "Phone", "level": 1},
+                {"id": "page", "label": "Page", "level": 1},
+                {"id": "held", "label": "Not public", "level": 1},
+            ],
+            arrows=[
+                {
+                    "id": "go",
+                    "from": "phone",
+                    "to": "page",
+                    "label": "photo",
+                    "actor": "user",
+                    "action": "sends photo",
+                    "kind": "normal",
+                },
+                {
+                    "id": "stop",
+                    "from": "page",
+                    "to": "held",
+                    "label": "not public",
+                    "actor": "page",
+                    "action": "not public",
+                    "kind": "failure",
+                },
+            ],
+            steps=[
+                {"n": 1, "arrow": "go", "text": "The user sends a photo.", "level": 1},
+            ],
+            user_impact=["The photo is not public."],
+            risks=[],
+            tradeoffs=[],
+        )
+        text = pe.render(model, pe.load_lens("product"), "md")
+        self.assertIn("Page → Not public", text)
+        self.assertNotIn("not public: not public", text.lower())
 
 
 class ProseDensity(unittest.TestCase):

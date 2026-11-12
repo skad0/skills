@@ -68,7 +68,7 @@
     },
     {
       "id": "held",
-      "label": "Not public",
+      "label": "Not shown on the map",
       "level": 1
     }
   ],
@@ -147,10 +147,10 @@
       "id": "a_held",
       "from": "server",
       "to": "held",
-      "label": "not public",
+      "label": "Report held for review",
       "kind": "failure",
       "actor": "server",
-      "action": "not public"
+      "action": "Report held for review"
     },
     {
       "id": "a_telegram",

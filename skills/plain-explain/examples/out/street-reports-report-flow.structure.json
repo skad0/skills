@@ -42,7 +42,7 @@
     },
     {
       "id": "held",
-      "label": "Not public",
+      "label": "Not shown on the map",
       "note": "",
       "shape": "box"
     }
@@ -116,7 +116,7 @@
       "from": "server",
       "to": "held",
       "actor": "server",
-      "action": "not public",
+      "action": "Report held for review",
       "kind": "failure",
       "dashed": true
     },
