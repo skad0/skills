@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plain-explain.local/model.schema.json",
+  "title": "plain-explain content model",
+  "description": "Lens-neutral, diagram-first explanation: boxes, short numbered arrows, optional compact steps, and a short closing. See MODEL.md.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["title", "goal", "boxes", "arrows"],
+  "properties": {
+    "title": { "type": "string", "minLength": 1, "description": "Shown as the heading." },
+    "goal": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One sentence under the picture, on every lens. Write it in words every lens allows."
+    },
+    "audience": {
+      "type": "string",
+      "description": "Optional hint of a default lens id. The CLI --lens flag is what actually applies."
+    },
+    "direction": {
+      "type": "string",
+      "enum": ["LR", "TB", "RL", "BT"],
+      "description": "Default flowchart direction. A lens may override it."
+    },
+    "legend": {
+      "type": "string",
+      "description": "Optional short line drawn as a Mermaid note node (for dashed = optional or failure)."
+    },
+    "boxes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/box" }
+    },
+    "arrows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/arrow" }
+    },
+    "steps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/step" },
+      "description": "Numbered 1..n, contiguous in the full model. A lens keeps steps whose level equals its max_level, then renumbers them onto arrow labels. Shown as a list only when the lens has show_steps."
+    },
+    "skipped": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Prefer a dashed arrow instead. Shown as a section only when the lens has show_skipped."
+    },
+    "risks": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "What can go wrong. At most three short bullets. Used when closing_section.field is 'risks'."
+    },
+    "user_impact": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "User-facing impact. At most three short bullets. Used when closing_section.field is 'user_impact'."
+    },
+    "tradeoffs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Tradeoffs and failure points. At most three short bullets. Used when closing_section.field is 'tradeoffs'."
+    },
+    "glossary": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/glossary_entry" },
+      "description": "Term to one-line definition. Terms become allowed for the vocabulary check. Shown only when the lens has show_glossary."
+    },
+    "details": {
+      "type": "string",
+      "description": "Optional extra detail, shown last, and only when the lens has show_details. Usually off."
+    }
+  },
+  "$defs": {
+    "visibility": {
+      "type": "string",
+      "enum": ["always", "internal", "external"],
+      "description": "Legacy. Prefer level, collapse_to, and aggregate. always: every lens. internal: only when show_internals. external: only when show_internals is false."
+    },
+    "box": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+          "description": "Stable id, also the Mermaid node id."
+        },
+        "label": { "type": "string", "minLength": 1, "description": "Short name on the box." },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3,
+          "description": "1 = everyone (product), 2 = tech-lead aggregates, 3 = engineer detail. Default 1."
+        },
+        "collapse_to": {
+          "type": "string",
+          "description": "Id of a coarser parent box. When that parent is visible, this box is hidden and arrows are rewritten through the parent."
+        },
+        "aggregate": {
+          "type": "boolean",
+          "description": "If true, shown only when the lens has collapse: true (a coarse parent such as Client or Storage)."
+        },
+        "group": {
+          "type": "string",
+          "description": "Mermaid subgraph title. Adjacent boxes with the same group are wrapped together."
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional short annotation drawn in parentheses on the box."
+        },
+        "shape": {
+          "type": "string",
+          "enum": ["box", "decision", "note", "round"],
+          "description": "Default box. decision draws a diamond; note a stadium; round a rounded rectangle."
+        },
+        "internal": {
+          "type": "boolean",
+          "description": "If true, shorthand for visibility: internal. Ignored when visibility is set. Prefer level and collapse_to."
+        },
+        "visibility": { "$ref": "#/$defs/visibility" }
+      }
+    },
+    "arrow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "label"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+          "description": "Stable id, referenced by steps[].arrow."
+        },
+        "from": { "type": "string", "description": "Box id of the sender." },
+        "to": { "type": "string", "description": "Box id of the receiver." },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What moves, at most five words. Visible steps prefix a number: '1. photo and place'."
+        },
+        "step": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional author hint of a primary step. Visible numbering comes from the lens-filtered, renumbered steps, not this field."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["normal", "optional", "failure", "query", "branch"],
+          "description": "normal is a solid hop. optional and failure are dashed. query may start a new phase (the map asking). branch is an alternate path."
+        },
+        "style": {
+          "type": "string",
+          "enum": ["solid", "dashed"],
+          "description": "Override. optional and failure are dashed even if this is omitted."
+        },
+        "internal": { "type": "boolean" },
+        "visibility": { "$ref": "#/$defs/visibility" }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["n", "text", "arrow"],
+      "properties": {
+        "n": { "type": "integer", "minimum": 1, "description": "1-based order in the full model. Must be contiguous in the full list." },
+        "text": { "type": "string", "minLength": 1, "description": "One short line. Shown only when the lens has show_steps." },
+        "arrow": { "type": "string", "description": "Id of the arrow this step describes. Used to put the renumbered step on that arrow's label." },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3,
+          "description": "Kept when equal to the lens max_level. Default 1."
+        }
+      }
+    },
+    "glossary_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["term", "definition"],
+      "properties": {
+        "term": { "type": "string", "minLength": 1 },
+        "definition": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One line, using only allowed terms, other glossary terms, or common words."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,37 @@
+# {{title}}
+
+*For: {{lens_name}}*
+
+```mermaid
+{{{mermaid}}}
+```
+
+**Goal.** {{goal}}
+{{#closing}}
+
+{{#items}}
+- {{.}}
+{{/items}}
+{{/closing}}
+{{#show_steps}}
+
+{{#steps}}
+{{n}}. {{text}}
+{{/steps}}
+{{/show_steps}}
+{{#glossary}}
+
+{{#entries}}
+- **{{term}}**: {{definition}}
+{{/entries}}
+{{/glossary}}
+{{#skipped}}
+
+{{#items}}
+- {{.}}
+{{/items}}
+{{/skipped}}
+{{#details}}
+
+{{details}}
+{{/details}}

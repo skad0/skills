@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>From a phone to the map</title>
+<style>
+  :root {
+    --fg: #1c1b18;
+    --muted: #5e5a52;
+    --bg: #f4f0e7;
+    --card: #fffcf6;
+    --line: #d8d2c4;
+    --accent: #2a3d36;
+    --on: #2a3d36;
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 18px; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    line-height: 1.5;
+  }
+  main { max-width: 52rem; margin: 0 auto; padding: 1.75rem 1.25rem 3rem; }
+  h1 { font-size: 1.65rem; font-weight: 600; line-height: 1.25; margin: 0 0 1rem; }
+  nav { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0 0 1rem; }
+  nav button {
+    font: inherit;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 0.25rem 0.7rem;
+    cursor: pointer;
+    color: var(--fg);
+  }
+  nav button[aria-selected="true"] {
+    background: var(--on);
+    color: var(--card);
+    border-color: var(--on);
+  }
+  .panel { display: none; }
+  .panel.on { display: block; }
+  .lens { color: var(--muted); font-style: italic; margin: 0 0 0.8rem; }
+  .goal { margin: 1rem 0 0; }
+  .goal strong { font-weight: 650; }
+  ol, ul { margin: 0.6rem 0 0; padding: 0 0 0 1.3rem; }
+  li { margin: 0 0 0.35rem; }
+  .diagram {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 1.1rem 0.8rem;
+    overflow-x: auto;
+    min-height: 12rem;
+  }
+  .diagram .mermaid { margin: 0; background: transparent; }
+</style>
+</head>
+<body>
+<main>
+  <h1>From a phone to the map</h1>
+  <nav role="tablist">
+    <button type="button" role="tab" data-tab="product" aria-selected="true">Product</button>
+    <button type="button" role="tab" data-tab="engineer-new" aria-selected="false">New engineer</button>
+    <button type="button" role="tab" data-tab="tech-lead" aria-selected="false">Tech lead</button>
+  </nav>
+  <section class="panel on" data-panel="product" role="tabpanel">
+    <p class="lens">For: Product</p>
+    <div class="diagram">
+      <pre class="mermaid">flowchart LR
+  phone["Phone"]
+  page["Report page"]
+  map["Map page"]
+  held["Not public"]
+  phone -->|"1. photo and place"| page
+  phone -.->|"via Telegram"| map
+  page -->|"2. new report"| map
+  page -.->|"not public"| held</pre>
+    </div>
+    <p class="goal"><strong>Goal.</strong> A user sends a photo of a street problem, and the report is shown on a public map.</p>
+    <ul>
+      <li>No account is needed.</li>
+      <li>Not shown at once: faces and plates are made hard to read first.</li>
+      <li>A photo not fit for public is not shown.</li>
+    </ul>
+  </section>
+  <section class="panel" data-panel="engineer-new" role="tabpanel">
+    <p class="lens">For: New engineer</p>
+    <div class="diagram">
+      <pre class="mermaid">flowchart TB
+  phone["Phone"]
+  page["Report page"]
+  server["Server (one process)"]
+  subgraph g_Storage["Storage"]
+    photos["Photo files"]
+    database["Database"]
+  end
+  map["Map page"]
+  held["Not public"]
+  phone -->|"1. photo and place"| page
+  page -->|"2. new report"| server
+  server -->|"3. original"| photos
+  server -->|"4. record"| database
+  server -->|"5. safe photo"| photos
+  map -->|"6. request"| server
+  server -->|"7. public reports"| map
+  server -.->|"not public"| held
+  phone -.->|"via Telegram"| server</pre>
+    </div>
+    <p class="goal"><strong>Goal.</strong> A user sends a photo of a street problem, and the report is shown on a public map.</p>
+    <ul>
+      <li>If blur does not work or the photo is graphic, the report is not public.</li>
+      <li>If there is no place, the server returns an error.</li>
+      <li>Many flags take a report off the map.</li>
+    </ul>
+    <ol>
+      <li>The user sends a photo and a place from the report page.</li>
+      <li>The report page sends a new report to the server.</li>
+      <li>The server stores the original photo as a private file.</li>
+      <li>The server writes a report record.</li>
+      <li>A worker blurs faces and plates and stores the safe photo.</li>
+      <li>The map page asks the server for public reports.</li>
+      <li>The server returns public reports; the map shows them.</li>
+    </ol>
+  </section>
+  <section class="panel" data-panel="tech-lead" role="tabpanel">
+    <p class="lens">For: Tech lead</p>
+    <div class="diagram">
+      <pre class="mermaid">flowchart TB
+  client["Client"]
+  service["Service"]
+  storage["Storage"]
+  map["Map page"]
+  held["Not public"]
+  client -->|"1. new report"| service
+  service -->|"2. original, record, safe photo"| storage
+  map -->|"3. request"| service
+  service -->|"4. public reports"| map
+  service -.->|"not public"| held
+  client -.->|"via Telegram"| service</pre>
+    </div>
+    <p class="goal"><strong>Goal.</strong> A user sends a photo of a street problem, and the report is shown on a public map.</p>
+    <ul>
+      <li>Public only after a safe photo: failure means never shown, and not at once.</li>
+      <li>Originals stay private; cost is two files and a worker.</li>
+      <li>Photo check is an outside service; form, photo work, and map share one place.</li>
+    </ul>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "strict", flowchart: { htmlLabels: true, curve: "basis" } });
+  document.querySelectorAll("nav [data-tab]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var id = btn.getAttribute("data-tab");
+      document.querySelectorAll("nav [data-tab]").forEach(function (b) {
+        b.setAttribute("aria-selected", b === btn ? "true" : "false");
+      });
+      document.querySelectorAll("[data-panel]").forEach(function (p) {
+        if (p.getAttribute("data-panel") === id) { p.classList.add("on"); }
+        else { p.classList.remove("on"); }
+      });
+    });
+  });
+</script>
+</body>
+</html>

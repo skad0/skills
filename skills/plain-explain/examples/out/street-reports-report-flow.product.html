@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>From a phone to the map</title>
+<style>
+  :root {
+    --fg: #1c1b18;
+    --muted: #5e5a52;
+    --bg: #f4f0e7;
+    --card: #fffcf6;
+    --line: #d8d2c4;
+    --accent: #2a3d36;
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 18px; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    line-height: 1.5;
+  }
+  main {
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 1.75rem 1.25rem 3rem;
+  }
+  h1 {
+    font-size: 1.65rem;
+    font-weight: 600;
+    line-height: 1.25;
+    margin: 0 0 0.25rem;
+  }
+  .lens {
+    color: var(--muted);
+    font-style: italic;
+    margin: 0 0 1rem;
+    font-size: 0.95rem;
+  }
+  .goal { margin: 1rem 0 0; font-size: 1.02rem; }
+  .goal strong { font-weight: 650; }
+  h2 {
+    font-size: 1.05rem;
+    font-weight: 650;
+    margin: 1.4rem 0 0.5rem;
+    color: var(--accent);
+  }
+  ol, ul { margin: 0.6rem 0 0; padding: 0 0 0 1.3rem; }
+  li { margin: 0 0 0.35rem; }
+  .diagram {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 1.1rem 0.8rem;
+    overflow-x: auto;
+    min-height: 12rem;
+  }
+  .diagram .mermaid { margin: 0; background: transparent; }
+</style>
+</head>
+<body>
+<main>
+  <h1>From a phone to the map</h1>
+  <p class="lens">For: Product</p>
+  <div class="diagram">
+    <pre class="mermaid">flowchart LR
+  phone["Phone"]
+  page["Report page"]
+  map["Map page"]
+  held["Not public"]
+  phone -->|"1. photo and place"| page
+  phone -.->|"via Telegram"| map
+  page -->|"2. new report"| map
+  page -.->|"not public"| held</pre>
+  </div>
+  <p class="goal"><strong>Goal.</strong> A user sends a photo of a street problem, and the report is shown on a public map.</p>
+  <ul>
+    <li>No account is needed.</li>
+    <li>Not shown at once: faces and plates are made hard to read first.</li>
+    <li>A photo not fit for public is not shown.</li>
+  </ul>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "strict", flowchart: { htmlLabels: true, curve: "basis" } });
+</script>
+</body>
+</html>

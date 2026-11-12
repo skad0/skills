@@ -1,0 +1,39 @@
+# Suggested replacements for unknown terms. Swappable: pass --synonyms PATH.
+# Format:  word: replacement | other replacement
+# Replacements should themselves be common or allowed words.
+fail: does not work
+fails: does not work
+failed: did not work
+failure: a step that does not work
+suggest: name
+suggested: named
+verify: check
+verified: checked
+handle: do
+handles: does
+handled: done
+draw: show
+draws: shows
+wait: not yet ready
+waiting: not yet ready
+delay: not shown at once
+protect: keep safe
+protects: keeps safe
+depend: use
+depends: uses
+dependency: an outside service
+separate: own
+gate: login
+automated: by a program
+serious: bad
+app: program
+safer: more safe
+later: after
+pending: not yet ready
+threshold: limit
+webhook: a request from outside
+latency: wait time
+deploy: put into use
+fallback: a backup path
+retry: try again
+timeout: a wait that runs out
