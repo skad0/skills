@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="842" height="696" viewBox="0 0 842 696" font-family="Georgia, Palatino, serif">
+<rect width="842" height="696" fill="#f4f0e7"/>
+<defs>
+<marker id="ah-norm" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#1c1b18"/></marker>
+<marker id="ah-opt" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#57534e"/></marker>
+<marker id="ah-fail" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#9a3412"/></marker>
+</defs>
+<text x="421" y="32" text-anchor="middle" font-size="18" fill="#1c1b18">From a phone to the map</text>
+<rect x="18" y="564" width="358" height="72" rx="8" fill="#e7e1d4" stroke="#d8d2c4"/>
+<text x="26" y="576" font-size="11" fill="#5e5a52">Files</text>
+<rect x="353" y="52" width="136" height="44" rx="6" fill="#fffcf6" stroke="#1c1b18" stroke-width="1.5"/>
+<text x="421" y="79" text-anchor="middle" font-size="14" fill="#1c1b18">User phone</text>
+<rect x="353" y="224" width="136" height="44" rx="6" fill="#fffcf6" stroke="#1c1b18" stroke-width="1.5"/>
+<text x="421" y="251" text-anchor="middle" font-size="14" fill="#1c1b18">Report page</text>
+<rect x="353" y="396" width="136" height="58" rx="6" fill="#fffcf6" stroke="#1c1b18" stroke-width="1.5"/>
+<text x="421" y="423" text-anchor="middle" font-size="14" fill="#1c1b18">Report server</text>
+<text x="421" y="441" text-anchor="middle" font-size="11" fill="#5e5a52">one process</text>
+<rect x="28" y="582" width="136" height="44" rx="6" fill="#fffcf6" stroke="#1c1b18" stroke-width="1.5"/>
+<text x="96" y="609" text-anchor="middle" font-size="14" fill="#1c1b18">Photo files</text>
+<rect x="228" y="582" width="138" height="44" rx="6" fill="#fffcf6" stroke="#1c1b18" stroke-width="1.5"/>
+<text x="297" y="609" text-anchor="middle" font-size="14" fill="#1c1b18">Report records</text>
+<rect x="430" y="582" width="136" height="44" rx="6" fill="#fffcf6" stroke="#1c1b18" stroke-width="1.5"/>
+<text x="498" y="609" text-anchor="middle" font-size="14" fill="#1c1b18">Map page</text>
+<rect x="630" y="582" width="184" height="44" rx="6" fill="#fffcf6" stroke="#1c1b18" stroke-width="1.5"/>
+<text x="722" y="609" text-anchor="middle" font-size="14" fill="#1c1b18">Not shown on the map</text>
+<path d="M 375 454 L 73 582" fill="none" stroke="#1c1b18" stroke-width="1.6" marker-end="url(#ah-norm)"/>
+<path d="M 421 96 L 421 224" fill="none" stroke="#1c1b18" stroke-width="1.6" marker-end="url(#ah-norm)"/>
+<path d="M 398 454 L 118 582" fill="none" stroke="#1c1b18" stroke-width="1.6" marker-end="url(#ah-norm)"/>
+<path d="M 421 454 L 297 582" fill="none" stroke="#1c1b18" stroke-width="1.6" marker-end="url(#ah-norm)"/>
+<path d="M 443 454 L 498 582" fill="none" stroke="#1c1b18" stroke-width="1.6" marker-end="url(#ah-norm)"/>
+<path d="M 421 268 L 421 396" fill="none" stroke="#1c1b18" stroke-width="1.6" marker-end="url(#ah-norm)"/>
+<path d="M 534 582 L 479 454" fill="none" stroke="#1c1b18" stroke-width="1.6" marker-end="url(#ah-norm)"/>
+<path d="M 353 74 Q 233 249 353 425" fill="none" stroke="#57534e" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#ah-opt)"/>
+<path d="M 466 454 L 722 582" fill="none" stroke="#9a3412" stroke-width="3" stroke-dasharray="7 4" marker-end="url(#ah-fail)"/>
+<rect x="324" y="152" width="146" height="16" rx="3" fill="#f4f0e7"/>
+<text x="397" y="164" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">user: photo and place</text>
+<rect x="340" y="324" width="114" height="16" rx="3" fill="#f4f0e7"/>
+<text x="397" y="336" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">user: new report</text>
+<rect x="210" y="531" width="114" height="16" rx="3" fill="#f4f0e7"/>
+<text x="267" y="543" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">server: original</text>
+<rect x="357" y="557" width="101" height="16" rx="3" fill="#f4f0e7"/>
+<text x="407" y="569" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">server: record</text>
+<rect x="151" y="487" width="127" height="16" rx="3" fill="#f4f0e7"/>
+<text x="214" y="499" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">worker: safe photo</text>
+<rect x="512" y="453" width="88" height="16" rx="3" fill="#f4f0e7"/>
+<text x="556" y="465" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">map: request</text>
+<rect x="352" y="528" width="153" height="16" rx="3" fill="#f4f0e7"/>
+<text x="428" y="540" text-anchor="middle" font-size="12" font-weight="400" fill="#1c1b18">server: public reports</text>
+<rect x="502" y="488" width="205" height="16" rx="3" fill="#f4f0e7"/>
+<text x="604" y="500" text-anchor="middle" font-size="12" font-weight="700" fill="#9a3412">server: Report held for review</text>
+<rect x="206" y="241" width="127" height="16" rx="3" fill="#f4f0e7"/>
+<text x="269" y="253" text-anchor="middle" font-size="12" font-weight="400" fill="#57534e">user: via Telegram</text>
+<text x="28" y="662" font-size="14" font-weight="700" fill="#9a3412">Failure</text>
+<text x="28" y="682" font-size="13" fill="#9a3412">Report held for review → Not shown on the map</text>
+</svg>

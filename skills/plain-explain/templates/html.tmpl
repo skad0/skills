@@ -58,6 +58,10 @@
     min-height: 12rem;
   }
   .diagram .mermaid { margin: 0; background: transparent; }
+  table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+  caption { text-align: left; font-weight: 650; margin: 0 0 0.35rem; }
+  td { border: 1px solid var(--line); padding: 0.35rem 0.6rem; }
+  table.failures caption { color: #9a3412; }
 </style>
 </head>
 <body>
@@ -67,13 +71,22 @@
   <div class="diagram">
     <pre class="mermaid">{{{mermaid}}}</pre>
   </div>
+{{#failures}}
+  <table class="failures">
+    <caption>Failure</caption>
+{{#rows}}
+    <tr><td>{{.}}</td></tr>
+{{/rows}}
+  </table>
+{{/failures}}
   <p class="goal"><strong>Goal.</strong> {{goal}}</p>
 {{#closing}}
-  <ul>
+  <table>
+    <caption>{{name}}</caption>
 {{#items}}
-    <li>{{.}}</li>
+    <tr><td>{{.}}</td></tr>
 {{/items}}
-  </ul>
+  </table>
 {{/closing}}
 {{#show_steps}}
   <ol>

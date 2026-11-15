@@ -1,0 +1,7 @@
+# Tech words that are not already in common-words.txt.
+# server, browser, page, request, and the other everyday ones live there.
+cache
+API
+queue
+JSON
+token

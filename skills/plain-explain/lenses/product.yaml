@@ -1,47 +1,6 @@
 id: product
 name: Product
-# Own list — user-facing words only (no server, database, API).
-allowed_terms:
-  - user
-  - page
-  - screen
-  - action
-  - result
-  - account
-  - photo
-  - report
-  - map
-  - form
-  - location
-  - place
-  - city
-  - button
-  - list
-  - filter
-  - message
-  - error
-  - phone
-  - public
-  - private
-  - category
-  - time
-  - date
-  - link
-  - show
-  - hide
-  - send
-  - check
-  - status
-  - image
-  - flag
-  - staff
-  - point
-  - problem
-  - street
-  - original
-  - face
-  - plate
-  - open
+extends: base
 max_boxes: 6
 min_boxes: 3
 max_steps: 6
@@ -53,7 +12,8 @@ show_steps: false
 show_glossary: false
 show_skipped: false
 direction: LR
-max_prose_words: 60
+max_prose_words: 45
+max_sentences_per_step: 1
 max_arrow_words: 5
 max_words_per_step: 20
 max_sentence_words: 20

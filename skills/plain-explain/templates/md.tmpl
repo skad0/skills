@@ -5,12 +5,22 @@
 ```mermaid
 {{{mermaid}}}
 ```
+{{#failures}}
+
+| Failure |
+| --- |
+{{#rows}}
+| {{.}} |
+{{/rows}}
+{{/failures}}
 
 **Goal.** {{goal}}
 {{#closing}}
 
+| {{name}} |
+| --- |
 {{#items}}
-- {{.}}
+| {{.}} |
 {{/items}}
 {{/closing}}
 {{#show_steps}}
